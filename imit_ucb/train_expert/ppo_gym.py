@@ -6,6 +6,7 @@ import os
 import sys
 import pickle
 import time
+import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils import *
@@ -65,7 +66,7 @@ if torch.cuda.is_available():
     torch.cuda.set_device(args.gpu_index)
 
 """environment"""
-if args.env_name == "gridworld-v0" or args.env_name == "ContinuousGridworld-v0" or args.env_name == "GaussianGridworld-v0" :
+if args.env_name == "gridworld-v0" or args.env_name == "ContinuousGridworld-v0" or args.env_name == "GaussianGridworld-v0" or args.env_name == "DiscreteGaussianGridworld-v0":
     env = gym.make(args.env_name, prop = args.noiseE, env_type = args.grid_type)
     subfolder = "env"+str(args.env_name)+"type"+str(args.grid_type)+"noiseE"+str(args.noiseE)
     if not os.path.isdir(assets_dir(subfolder)):
@@ -104,7 +105,6 @@ state_dim = env.observation_space.shape[0]
 is_disc_action = len(env.action_space.shape) == 0
 running_state = lambda x: x #ZFilter((state_dim,), clip=5)
 # running_reward = ZFilter((1,), demean=False, clip=10)
-
 """seeding"""
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
@@ -136,9 +136,11 @@ agent = Agent(env, policy_net, device, running_state=running_state, render=args.
 def update_params(batch, i_iter):
     states = torch.from_numpy(np.stack(batch.state)).to(dtype).to(device)
     actions = torch.from_numpy(np.stack(batch.action)).to(dtype).to(device)
-    import matplotlib.pyplot as plt
-    plt.scatter(np.stack(batch.state)[:,0], np.stack(batch.state)[:,1] )
-    plt.show()
+    
+    if not i_iter % 10:
+        plt.figure(i_iter)
+        plt.scatter(np.stack(batch.state)[:,0], np.stack(batch.state)[:,1] )
+        plt.savefig("figs/"+ str(i_iter) + ".png")
     rewards = torch.from_numpy(np.stack(batch.reward)).to(dtype).to(device)
     masks = torch.from_numpy(np.stack(batch.mask)).to(dtype).to(device)
     with torch.no_grad():
