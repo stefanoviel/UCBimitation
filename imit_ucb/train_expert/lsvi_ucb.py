@@ -25,7 +25,7 @@ parser.add_argument('--model-path', metavar='G',
                     help='path of pre-trained model')
 parser.add_argument('--render', action='store_true', default=False,
                     help='render the environment')
-parser.add_argument('--beta', type=float, default=-0.0, metavar='G',
+parser.add_argument('--beta', type=float, default=100.0, metavar='G',
                     help='log std for the policy (default: -0.0)')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
                     help='discount factor (default: 0.99)')
@@ -90,85 +90,82 @@ np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 env.seed(args.seed)
 
-value_params = np.zeros(state_dim + env.action_space.n)
-bonus
-"""create agent"""
-states_dataset = []
-actions_dataset = []
-states, actions = collect_trajectories(value_params, env, states_dataset, actions_dataset)
-states_dataset.append(states)
-actions_dataset.append(actions)
-
-def collect_trajectories(values_params, env):
+def collect_trajectories(value_params, env, covariance_inv):
     state = env.reset()
     action_features = np.eye(env.action_space.n)
-    value = value_params.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
-    reward = env.compute_reward()
-    bonus = compute_bonus(state,states_dataset, actions_dataset)
-    action = np.argmax(reward + args.gamma*value + args.beta*bonus)
-    next_state, _, done, _ = 
-def compute_bonus(state, states_dataset, actions_dataset):
-    for state,action in zip(states_dataset, actions_dataset):
-        features
-
-
-def update_params(batch, i_iter):
-    states = torch.from_numpy(np.stack(batch.state)).to(dtype).to(device)
-    actions = torch.from_numpy(np.stack(batch.action)).to(dtype).to(device)
-    
-    if not i_iter % 10:
-        plt.figure(i_iter)
-        plt.scatter(np.stack(batch.state)[:,0], np.stack(batch.state)[:,1] )
-        plt.savefig("figs/"+ str(i_iter) + ".png")
-    rewards = torch.from_numpy(np.stack(batch.reward)).to(dtype).to(device)
-    masks = torch.from_numpy(np.stack(batch.mask)).to(dtype).to(device)
-    with torch.no_grad():
-        values = value_net(states)
-        fixed_log_probs = policy_net.get_log_prob(states, actions)
-
-    """get advantage estimation from the trajectories"""
-    advantages, returns = estimate_advantages(rewards, masks, values, args.gamma, args.tau, device)
-
-    """perform mini-batch PPO update"""
-    optim_iter_num = int(math.ceil(states.shape[0] / optim_batch_size))
-    for _ in range(optim_epochs):
-        perm = np.arange(states.shape[0])
-        np.random.shuffle(perm)
-        perm = LongTensor(perm).to(device)
-
-        states, actions, returns, advantages, fixed_log_probs = \
-            states[perm].clone(), actions[perm].clone(), returns[perm].clone(), advantages[perm].clone(), fixed_log_probs[perm].clone()
-
-        for i in range(optim_iter_num):
-            ind = slice(i * optim_batch_size, min((i + 1) * optim_batch_size, states.shape[0]))
-            states_b, actions_b, advantages_b, returns_b, fixed_log_probs_b = \
-                states[ind], actions[ind], advantages[ind], returns[ind], fixed_log_probs[ind]
-
-            ppo_step(policy_net, value_net, optimizer_policy, optimizer_value, 1, states_b, actions_b, returns_b,
-                     advantages_b, fixed_log_probs_b, args.clip_epsilon, args.l2_reg)
-
-
-def main_loop():
+    h = 0
+    states = []
+    actions = []
     rewards = []
-    for i_iter in range(args.max_iter_num):
-        """generate multiple trajectories that reach the minimum batch_size"""
-        batch, log = agent.collect_samples(args.min_batch_size)
-        t0 = time.time()
-        update_params(batch, i_iter)
-        t1 = time.time()
+    done = False
+    while h < 1e4 and not done:
+        value = value_params.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
+        reward = env.compute_reward()
+        bonus = compute_bonus(state,covariance_inv)
+        action = np.argmax(np.clip(reward + args.gamma*value + args.beta*bonus,
+                                -10/(1 - args.gamma),10/(1 - args.gamma)))
+        next_state, _, done, _ = env.step(action)
+        states.append(state)
+        actions.append(action)
+        rewards.append(reward)
+        state = next_state 
+        h = h + 1
+    print(done)
+    if done:
+        states.append(state)
+        actions.append(np.random.choice(env.action_space.n))
+        next_state, reward, done, _ = env.step(action)
+        rewards.append(reward)
+        states.append(next_state)
+    return states, actions, rewards
 
-        if i_iter % args.log_interval == 0:
-            print('{}\tT_sample {:.4f}\tT_update {:.4f}\tR_min {:.2f}\tR_max {:.2f}\tR_avg {:.2f}'.format(
-                i_iter, log['sample_time'], t1-t0, log['min_reward'], log['max_reward'], log['avg_reward']))
-            rewards.append([log['min_reward'], log['max_reward'], log['avg_reward']])
-        if args.save_model_interval > 0 and (i_iter+1) % args.save_model_interval == 0:
-            to_device(torch.device('cpu'), policy_net, value_net)
-            pickle.dump((policy_net, value_net),
-                        open(os.path.join(assets_dir(subfolder), 'learned_models/{}_ppo_{}.p'.format(args.env_name, i_iter)), 'wb'))
-            to_device(device, policy_net, value_net)
-            pickle.dump(np.array(rewards),open(os.path.join(assets_dir(subfolder),'learned_models/reward_{}.p'.format(args.env_name)), 'wb')) 
-        """clean up gpu memory"""
-        torch.cuda.empty_cache()
+def compute_covariance(states_dataset, actions_dataset):
+    features = []
+    covariance = 1/8e-2*np.eye(state_dim + env.action_space.n)
+    for state,action in zip(states_dataset, actions_dataset):
+        features.append(np.concatenate([state, np.eye(env.action_space.n)[action]]))
+    for feature in features:
+        covariance += np.outer(feature, feature)
+    return covariance
+def compute_bonus(state, covariance_inv):
+    bonus = []
+    for a in range(env.action_space.n):
+        feature = np.concatenate([state, np.eye(env.action_space.n)[a]])
+        bonus.append(np.sqrt(feature.dot(covariance_inv).dot(feature)))
+    return np.array(bonus)
 
-
-main_loop()
+def run_lsvi_ucb(K = 100):
+    value_params = np.zeros(state_dim + env.action_space.n)
+    action_features = np.eye(env.action_space.n)
+    covariance_inv = 1/8e-2*np.eye(state_dim + env.action_space.n)
+    """create agent"""
+    states_dataset = []
+    actions_dataset = []
+    rewards_dataset = []
+    
+    for k in range(K):
+        states, actions, rewards = collect_trajectories(value_params, env, covariance_inv )
+        print("Episode " + str(k) + ": " + str(np.sum(rewards)))
+        states_dataset = states_dataset + states
+        actions_dataset = actions_dataset + actions
+        rewards_dataset = rewards_dataset + rewards
+        covariance = compute_covariance(states_dataset, actions_dataset)
+        covariance_inv = np.linalg.inv(covariance)
+        print(value_params)
+        targets_dataset = []
+        for state, reward, next_state in zip(states_dataset[:-1], rewards_dataset, states_dataset[1:]):
+            targets_dataset.append(np.max(np.clip(reward + args.gamma*value_params.dot(
+                np.vstack([next_state.reshape(-1,1).repeat(4, axis=1), action_features ])) 
+                + args.beta*compute_bonus(state, covariance_inv), -10/(1 - args.gamma), 10/(1 - args.gamma))))
+        
+        target = 0
+        for state,action, value in zip(states_dataset[:-1], actions_dataset, targets_dataset):
+            target = target + value*np.concatenate([state, np.eye(env.action_space.n)[action]])
+        value_params = covariance_inv.dot(target)
+        if not k % 1:
+             plt.figure(k)
+             plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1] )
+             plt.savefig("figs/"+ str(k) + ".png")
+        
+        k = k + 1
+run_lsvi_ucb()
