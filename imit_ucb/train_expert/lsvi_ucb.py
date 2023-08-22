@@ -62,6 +62,7 @@ if args.env_name == "gridworld-v0" or args.env_name == "ContinuousGridworld-v0" 
     if not os.path.isdir(assets_dir(subfolder)):
         os.makedirs(assets_dir(subfolder))
         os.makedirs(assets_dir(subfolder+"/learned_models"))
+        os.makedirs(assets_dir(subfolder+"/expert_trajs"))
 elif args.env_name == "CartPole-v1" or args.env_name == "Acrobot-v1":
     env = gym.make(args.env_name)
     subfolder = "env"+ args.env_name + "mass" + str(args.mass_mul)+ "len" + str(args.len_mul)
@@ -103,7 +104,7 @@ def collect_trajectories(value_params, env, covariance_inv):
         reward = env.compute_reward()
         bonus = compute_bonus(state,covariance_inv)
         action = np.argmax(np.clip(reward + args.gamma*value + args.beta*bonus,
-                                -10/(1 - args.gamma),10/(1 - args.gamma)))
+                                -80/(1 - args.gamma),100/(1 - args.gamma)))
         next_state, _, done, _ = env.step(action)
         states.append(state)
         actions.append(action)
@@ -149,23 +150,35 @@ def run_lsvi_ucb(K = 100):
         states_dataset = states_dataset + states
         actions_dataset = actions_dataset + actions
         rewards_dataset = rewards_dataset + rewards
+        # Save expert data
+        states_to_save = [states]
+        actions_to_save = [actions]
+        for _ in range(1):
+            states_to_app, actions_to_app, _ = collect_trajectories(value_params, env, covariance_inv )
+            states_to_save.append(states_to_app)
+            actions_to_save.append(actions_to_app)
+            # if not k % 45:
+            #     plt.figure(k)
+            #     plt.scatter(np.stack(states_to_app)[:,0], np.stack(states_to_app)[:,1] )
+            #     plt.savefig("figs/"+ str(k) + ".png")
+        with open(assets_dir(subfolder+"/expert_trajs")+"/trajs"+str(k)+".pkl", "wb") as f:
+            pickle.dump({"states": states_to_save, "actions": actions_to_save}, f)
         covariance = compute_covariance(states_dataset, actions_dataset)
         covariance_inv = np.linalg.inv(covariance)
-        print(value_params)
         targets_dataset = []
         for state, reward, next_state in zip(states_dataset[:-1], rewards_dataset, states_dataset[1:]):
             targets_dataset.append(np.max(np.clip(reward + args.gamma*value_params.dot(
                 np.vstack([next_state.reshape(-1,1).repeat(4, axis=1), action_features ])) 
-                + args.beta*compute_bonus(state, covariance_inv), -10/(1 - args.gamma), 10/(1 - args.gamma))))
+                + args.beta*compute_bonus(next_state, covariance_inv), -80/(1 - args.gamma), 100/(1 - args.gamma))))
         
         target = 0
         for state,action, value in zip(states_dataset[:-1], actions_dataset, targets_dataset):
             target = target + value*np.concatenate([state, np.eye(env.action_space.n)[action]])
         value_params = covariance_inv.dot(target)
-        if not k % 1:
-             plt.figure(k)
-             plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1] )
-             plt.savefig("figs/"+ str(k) + ".png")
+        # if not k % 45:
+        #      plt.figure(k)
+        #      plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1] )
+        #      plt.savefig("figs/"+ str(k) + ".png")
         
         k = k + 1
 run_lsvi_ucb()
