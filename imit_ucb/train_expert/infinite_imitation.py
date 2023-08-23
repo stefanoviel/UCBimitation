@@ -2,6 +2,7 @@ import argparse
 import gym
 import gym_simple
 import my_gym
+from scipy import special
 import os
 import sys
 import pickle
@@ -56,7 +57,10 @@ if torch.cuda.is_available():
     torch.cuda.set_device(args.gpu_index)
 
 """environment"""
-if args.env_name == "gridworld-v0" or args.env_name == "ContinuousGridworld-v0" or args.env_name == "GaussianGridworld-v0" or args.env_name == "DiscreteGaussianGridworld-v0":
+if ( args.env_name == "gridworld-v0" or 
+        args.env_name == "ContinuousGridworld-v0" or
+            args.env_name == "GaussianGridworld-v0" or 
+                args.env_name == "DiscreteGaussianGridworld-v0"):
     env = gym.make(args.env_name, prop = args.noiseE, env_type = args.grid_type)
     subfolder = "env"+str(args.env_name)+"type"+str(args.grid_type)+"noiseE"+str(args.noiseE)
     with open(assets_dir(subfolder+"/expert_trajs/"+args.expert_trajs), "rb") as f:
@@ -84,25 +88,31 @@ def compute_features_expectation(states,actions, env):
         features.append(features_exp)
     return np.mean(features, axis=0)
 
-compute_features_expectation(data["states"], data["actions"],env)
+expert_fev = compute_features_expectation(data["states"], data["actions"],env)
 
-def collect_trajectories(value_params, env, covariance_inv):
+def collect_trajectories(value_params_list, reward_weights, env, covariance_inv):
     state = env.reset()
     action_features = np.eye(env.action_space.n)
     h = 0
     states = []
+    next_states = []
     actions = []
     rewards = []
     done = False
     while h < 1e4 and not done:
-        value = value_params.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
-        reward = env.compute_reward()
         bonus = compute_bonus(state,covariance_inv)
-        action = np.argmax(np.clip(reward + args.gamma*value + args.beta*bonus,
-                                -80/(1 - args.gamma),100/(1 - args.gamma)))
-        next_state, _, done, _ = env.step(action)
+        sum = 0
+        for value_params, w in zip(value_params_list,reward_weights):
+            value = value_params.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
+            r = w.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
+            sum = sum + np.clip(r + args.gamma*value + args.beta*bonus,
+                                -80/(1 - args.gamma),100/(1 - args.gamma))
+        action_distribution = special.softmax(sum/len(value_params_list))
+        action = np.random.choice(env.action_space.n, p=action_distribution)
+        next_state, reward, done, _ = env.step(action)
         states.append(state)
         actions.append(action)
+        next_states.append(next_state)
         rewards.append(reward)
         state = next_state 
         h = h + 1
@@ -112,8 +122,8 @@ def collect_trajectories(value_params, env, covariance_inv):
         actions.append(np.random.choice(env.action_space.n))
         next_state, reward, done, _ = env.step(action)
         rewards.append(reward)
-        states.append(next_state)
-    return states, actions, rewards
+        next_states.append(next_state)
+    return states, actions, rewards, next_states
 
 def compute_covariance(states_dataset, actions_dataset):
     features = []
@@ -130,50 +140,67 @@ def compute_bonus(state, covariance_inv):
         bonus.append(np.sqrt(feature.dot(covariance_inv).dot(feature)))
     return np.array(bonus)
 
-def run_lsvi_ucb(K = 100):
+def run_imitation_learning(K = 100, tau=5):
     value_params = np.zeros(state_dim + env.action_space.n)
+    value_params_list = [value_params]
+    w = np.zeros(state_dim + env.action_space.n)
+    reward_weights = [w]
     action_features = np.eye(env.action_space.n)
     covariance_inv = 1/8e-2*np.eye(state_dim + env.action_space.n)
     """create agent"""
-    states_dataset = []
-    actions_dataset = []
-    rewards_dataset = []
     
     for k in range(K):
-        states, actions, rewards = collect_trajectories(value_params, env, covariance_inv )
-        print("Episode " + str(k) + ": " + str(np.sum(rewards)))
-        states_dataset = states_dataset + states
-        actions_dataset = actions_dataset + actions
-        rewards_dataset = rewards_dataset + rewards
-        # Save expert data
-        states_to_save = [states]
-        actions_to_save = [actions]
-        for _ in range(1):
-            states_to_app, actions_to_app, _ = collect_trajectories(value_params, env, covariance_inv )
-            states_to_save.append(states_to_app)
-            actions_to_save.append(actions_to_app)
-            # if not k % 45:
-            #     plt.figure(k)
-            #     plt.scatter(np.stack(states_to_app)[:,0], np.stack(states_to_app)[:,1] )
-            #     plt.savefig("figs/"+ str(k) + ".png")
-        with open(assets_dir(subfolder+"/expert_trajs")+"/trajs"+str(k)+".pkl", "wb") as f:
-            pickle.dump({"states": states_to_save, "actions": actions_to_save}, f)
+        states_dataset = []
+        actions_dataset = []
+        next_states_dataset = []
+        for i in range(tau):
+            states, actions, true_rewards, next_states = collect_trajectories(value_params_list, 
+                                                                reward_weights, 
+                                                                env, 
+                                                                covariance_inv )
+            if i == 0:
+                states_traj_data = [states]
+                actions_traj_data = [actions]
+            else:
+                states_traj_data.append(states)
+                actions_traj_data.append(actions)
+
+            print("Episode " + str(k) + ": " + str(np.sum(true_rewards)))
+            states_dataset = states_dataset + states
+            actions_dataset = actions_dataset + actions
+            next_states_dataset = next_states_dataset + next_states
+        reward_weights = []
+        for i in range(tau):
+            
+            w = w - \
+                0.001*(compute_features_expectation(states_traj_data,actions_traj_data,env) - expert_fev)
+            reward_weights.append(w)
         covariance = compute_covariance(states_dataset, actions_dataset)
         covariance_inv = np.linalg.inv(covariance)
         targets_dataset = []
-        for state, reward, next_state in zip(states_dataset[:-1], rewards_dataset, states_dataset[1:]):
-            targets_dataset.append(np.max(np.clip(reward + args.gamma*value_params.dot(
-                np.vstack([next_state.reshape(-1,1).repeat(4, axis=1), action_features ])) 
-                + args.beta*compute_bonus(next_state, covariance_inv), -80/(1 - args.gamma), 100/(1 - args.gamma))))
+        value_params_list = []
+        for i in range(tau):
+            for state, next_state in zip(states_dataset, next_states_dataset):
+                reward = reward_weights[i].dot(
+                    np.vstack([next_state.reshape(-1,1).repeat(4, axis=1), action_features ])) 
+                targets_dataset.append(special.logsumexp(np.clip(reward + args.gamma*value_params.dot(
+                    np.vstack([next_state.reshape(-1,1).repeat(4, axis=1), action_features ])) 
+                    + args.beta*compute_bonus(next_state, covariance_inv), -80/(1 - args.gamma), 
+                    100/(1 - args.gamma))))
+            
+            target = 0
+            #i = 0
+            for state,action, value in zip(states_dataset, actions_dataset, targets_dataset):
+                #i = i + 1
+                #print(i)
+                target = target + value*np.concatenate([state, np.eye(env.action_space.n)[action]])
+            value_params = covariance_inv.dot(target)
+            value_params_list.append(value_params)
         
-        target = 0
-        for state,action, value in zip(states_dataset[:-1], actions_dataset, targets_dataset):
-            target = target + value*np.concatenate([state, np.eye(env.action_space.n)[action]])
-        value_params = covariance_inv.dot(target)
-        # if not k % 45:
-        #      plt.figure(k)
-        #      plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1] )
-        #      plt.savefig("figs/"+ str(k) + ".png")
+        plt.figure(k)
+        plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1], color="blue" )
+        plt.scatter(np.stack(data["states"][0])[:,0], np.stack(data["states"][0])[:,1],color="red")
+        plt.savefig("figs/"+ str(k) + "imit.png")
         
         k = k + 1
-run_lsvi_ucb()
+run_imitation_learning()
