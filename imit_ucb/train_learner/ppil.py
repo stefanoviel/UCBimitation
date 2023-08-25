@@ -165,13 +165,12 @@ def run_ppil(K = 100, tau=5):
         for _ in range(100):
             sample = np.random.choice(len(states_dataset), p = z)
             sample2 = np.random.choice(len(actions_traj_data))
-            g_hat = - np.array([states_dataset[sample], 
-                                action_features[actions_dataset[sample]]]) + \
-                                    args.gamma*np.array([next_states_dataset[sample], 
+            g_hat = - np.concatenate([states_dataset[sample], action_features[actions_dataset[sample]]]) + \
+                                    args.gamma*np.concatenate([next_states_dataset[sample], 
                                 action_features[next_actions_dataset[sample]]]) + \
-                                     (1 - args.gamma)*np.array([next_states_dataset[0], 
+                                     (1 - args.gamma)*np.concatenate([next_states_dataset[0], 
                                 action_features[actions_traj_data[sample2][0]]])
-            import pdb; pdb.set_trace()
+            
             r = w.dot(np.concatenate([states_dataset[sample], action_features[actions_dataset[sample]]]))
             Q = theta.dot(np.concatenate(
                 [states_dataset[sample], action_features[actions_dataset[sample]]]
