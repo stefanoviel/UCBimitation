@@ -86,7 +86,7 @@ def compute_features_expectation(states,actions, env):
                 args.gamma**h * np.concatenate([state, np.eye(env.action_space.n)[action]])
             h = h + 1
         features.append(features_exp)
-    return np.mean(features, axis=0)
+    return (1 - args.gamma)*np.mean(features, axis=0)
 
 expert_fev = compute_features_expectation(data["states"], data["actions"],env)
 
@@ -100,12 +100,12 @@ def collect_trajectories(value_params_list, env):
     actions = []
     rewards = []
     done = False
-    while h < 1e4 and not done:
+    while h < 4e4 and not done: #before was 4e4
         sum = 0
         for value_params in value_params_list:
             value = value_params.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
             sum = sum + value
-        action_distribution = special.softmax(args.eta*sum/len(value_params_list))
+        action_distribution = special.softmax(-args.eta*sum/len(value_params_list))
         action = np.random.choice(env.action_space.n, p=action_distribution)
         next_state, reward, done, _ = env.step(action)
         states.append(state)
@@ -119,7 +119,7 @@ def collect_trajectories(value_params_list, env):
     for value_params in value_params_list:
         value = value_params.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
         sum = sum + value
-    action_distribution = special.softmax(args.eta*sum/len(value_params_list))
+    action_distribution = special.softmax(-args.eta*sum/len(value_params_list))
     action = np.random.choice(env.action_space.n, p=action_distribution)
     next_actions.append(action)
     print(done)
@@ -162,38 +162,44 @@ def run_ppil(K = 100, tau=5):
             next_actions_dataset = next_actions_dataset + next_actions
         ### Approxiately solve logistic Bellman error minimization
         z = np.ones(len(states_dataset))/len(states_dataset)
-        for _ in range(100):
+        for _ in range(20): # before was 100
             sample = np.random.choice(len(states_dataset), p = z)
             sample2 = np.random.choice(len(actions_traj_data))
+
+            sample3 = np.random.choice(len(states_dataset), p = z)
             g_hat = - np.concatenate([states_dataset[sample], action_features[actions_dataset[sample]]]) + \
                                     args.gamma*np.concatenate([next_states_dataset[sample], 
                                 action_features[next_actions_dataset[sample]]]) + \
                                      (1 - args.gamma)*np.concatenate([next_states_dataset[0], 
                                 action_features[actions_traj_data[sample2][0]]])
             
-            r = w.dot(np.concatenate([states_dataset[sample], action_features[actions_dataset[sample]]]))
-            Q = theta.dot(np.concatenate(
-                [states_dataset[sample], action_features[actions_dataset[sample]]]
-                ))
-            Q_next = theta.dot(
-                np.vstack([next_states_dataset[sample].reshape(-1,1).repeat(4, axis=1), action_features ]
-                ))
-            sum = 0
-            for past_theta in value_params_list:
-                value = past_theta.dot(
-                    np.vstack([next_states_dataset[sample].reshape(-1,1).repeat(4, axis=1), 
-                    action_features ]))
-                sum = sum + value
-            pi = special.softmax(args.eta*sum/len(value_params_list))
-            
-            V_next = 1/args.eta*special.logsumexp(args.eta*Q_next + np.log(pi))
             delta = np.zeros(len(states_dataset))
-            delta[sample] = r + V_next - Q
-            z = special.softmax(delta)
-            theta = theta - 0.01*g_hat
-            w = w - 0.001*(compute_features_expectation(states_traj_data, actions_traj_data,env)
+            for s in range(len(states_dataset)):
+                r = w.dot(np.concatenate([states_dataset[s], action_features[actions_dataset[s]]]))
+                Q = theta.dot(np.concatenate(
+                    [states_dataset[s], action_features[actions_dataset[s]]]
+                    ))
+                Q_next = theta.dot(
+                    np.vstack([next_states_dataset[s].reshape(-1,1).repeat(4, axis=1), action_features ]
+                    ))
+                sum = 0
+                for past_theta in value_params_list:
+                    value = past_theta.dot(
+                        np.vstack([next_states_dataset[s].reshape(-1,1).repeat(4, axis=1), 
+                        action_features ]))
+                    sum = sum + value
+                
+                pi = special.softmax(-args.eta*sum/len(value_params_list))
+                V_next = -1/args.eta*special.logsumexp(-args.eta*Q_next + np.log(pi))
+               
+                delta[s] = r + V_next - Q
+            z = special.softmax(-delta)
+            theta = theta + 0.005*g_hat
+            #compute_features_expectation(states_traj_data, actions_traj_data,env)
+            w = w + ( np.concatenate([states_dataset[sample3], action_features[actions_dataset[sample3]]])
                             -
-                            expert_fev)
+                            expert_fev) #0.001
+            
             
 
         
