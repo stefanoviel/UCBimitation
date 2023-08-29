@@ -33,3 +33,9 @@ For AIRL
 python train_learner/gail.py --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs16.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --noiseE 0.0 --reward-type airl
 """
 
+For REIRL
+
+"""
+python train_learner/reirl.py --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs16.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --noiseE 0.0
+"""
+
