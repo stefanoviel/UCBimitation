@@ -202,5 +202,4 @@ def run_imitation_learning(K = 100, tau=5):
         plt.scatter(np.stack(data["states"][0])[:,0], np.stack(data["states"][0])[:,1],color="red")
         plt.savefig("figs/"+ str(k) + "imit.png")
         
-        k = k + 1
 run_imitation_learning()

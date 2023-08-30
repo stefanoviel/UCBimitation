@@ -100,7 +100,7 @@ def collect_trajectories(value_params_list, env):
     actions = []
     rewards = []
     done = False
-    while h < 4e4 and not done: #before was 4e4
+    while h < 4e3 and not done: #before was 4e4
         sum = 0
         for value_params in value_params_list:
             value = value_params.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
@@ -132,7 +132,7 @@ def collect_trajectories(value_params_list, env):
         next_actions.append(action)
     return states, actions, rewards, next_states, next_actions
 
-def run_ppil(K = 100, tau=1):
+def run_iqlearn(K = 100, tau=1):
     theta = np.zeros(state_dim + env.action_space.n)
     value_params_list = [theta]
     w = np.zeros(state_dim + env.action_space.n)
@@ -163,49 +163,53 @@ def run_ppil(K = 100, tau=1):
         ### Approxiately solve logistic Bellman error minimization
         for _ in range(20): # before was 100
             gradient=0
-            n_trajs = len(states_dataset)
-            for state, action, next_state in zip(states_dataset,
-                        actions_dataset,
-                        next_states_dataset):
-                feature_s_a = np.concatenate([state, action_features[action]])
-                Q_s_a = feature_s_a.squeeze(0).dot(theta)
-                features_next_state = torch.stack([ np.concatenate([next_state, 
-                                                    action_features[a]]) for a in range(env.action_space.n)])
-                Q_next_state = features_next_state.matmul(theta)
-                V_next_state = torch.logsumexp(Q_next_state, axis=0)
-                
-                probs = torch.softmax(Q_next_state, axis=0)
-                gradient += (feature_s_a - args.gamma*features_next_state.T.matmul(probs))*(1 - 0.5*Q_s_a + 0.5*args.gamma*V_next_state)
-            gradient = gradient/n_trajs
+            n = 0
+            for traj_state, traj_actions in zip(data["states"], data["actions"]):
+                for state, action, next_state in zip(traj_state[:-1],
+                            traj_actions[:-1],
+                            traj_state[1:]):
+                    n = n + 1
+                    feature_s_a = np.concatenate([state, action_features[action]])
+                    Q_s_a = feature_s_a.dot(theta)
+                    features_next_state = np.vstack([ np.concatenate([next_state, 
+                                                        action_features[a]]) for a in range(env.action_space.n)])
+                    Q_next_state = features_next_state.dot(theta)
+                    V_next_state = special.logsumexp(Q_next_state, axis=0)
+                    
+                    probs = special.softmax(Q_next_state, axis=0)
+                    gradient += (feature_s_a - args.gamma*features_next_state.T.dot(probs))*(0.5*Q_s_a - 0.5*args.gamma*V_next_state)
+            gradient = gradient/n
             
-            
+            gradient_2 = 0
+            n = len(states_dataset)
             for b in zip(states_dataset,
                         actions_dataset,
                         next_states_dataset):
                 state, action, next_state = b
-                features_state = torch.stack([ np.concatenate([state, 
+                features_state = np.vstack([ np.concatenate([state, 
                                                     action_features[a]]) for a in range(env.action_space.n)])
                 
-                features_next_state = torch.stack([ np.concatenate([next_state, 
+                features_next_state = np.vstack([ np.concatenate([next_state, 
                                                     action_features[a]]) for a in range(env.action_space.n)])
                 
-                Q_next_state = features_next_state.matmul(theta)
-                Q_state = features_state.matmul(theta)
+                Q_next_state = features_next_state.dot(theta)
+                Q_state = features_state.dot(theta)
                 
-                probs_next_state = torch.softmax(Q_next_state, axis=0)
-                probs_state = torch.softmax(Q_state, axis=0)
-                
-                gradient_2 += features_state.T.matmul(probs_state) - args.gamma*features_next_state.T.matmul(probs_next_state)
-            gradient = gradient - gradient_2/n_trajs
+                probs_next_state = special.softmax(Q_next_state, axis=0)
+                probs_state = special.softmax(Q_state, axis=0)
+
+                value_state = special.logsumexp(Q_state)
+                value_next_state = special.logsumexp(Q_next_state)
+                gradient_2 += (features_state.T.dot(probs_state) - args.gamma*features_next_state.T.dot(probs_next_state))*(value_state - args.gamma*value_next_state)
+            gradient = gradient - gradient_2/n
         
             theta = theta + 0.005*gradient
         
-        value_params_list.append(theta)
+        value_params_list = [theta]
         
         plt.figure(k)
         plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1], color="blue" )
         plt.scatter(np.stack(data["states"][0])[:,0], np.stack(data["states"][0])[:,1],color="red")
         plt.savefig("figs/"+ str(k) + "iqlearn.png")
         
-        k = k + 1
-run_ppil()
+run_iqlearn()

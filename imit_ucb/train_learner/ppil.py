@@ -210,5 +210,4 @@ def run_ppil(K = 100, tau=5):
         plt.scatter(np.stack(data["states"][0])[:,0], np.stack(data["states"][0])[:,1],color="red")
         plt.savefig("figs/"+ str(k) + "ppil.png")
         
-        k = k + 1
 run_ppil()
