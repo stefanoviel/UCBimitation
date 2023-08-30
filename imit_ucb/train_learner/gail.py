@@ -88,11 +88,16 @@ if ( args.env_name == "gridworld-v0" or
     subfolder = "env"+str(args.env_name)+"type"+str(args.grid_type)+"noiseE"+str(args.noiseE)
     with open(assets_dir(subfolder+"/expert_trajs/"+args.expert_trajs), "rb") as f:
         data = pickle.load(f)
-
-if not os.path.isdir(assets_dir(subfolder+f"/{args.alg}/learned_models")):
-    os.makedirs(assets_dir(subfolder+f"/{args.alg}/learned_models"))
-if not os.path.isdir(assets_dir(subfolder+f"/{args.alg}/reward_history")):
-    os.makedirs(assets_dir(subfolder+f"/{args.alg}/reward_history"))
+if reward_type == "airl":
+    if not os.path.isdir(assets_dir(subfolder+f"/airl/learned_models")):
+        os.makedirs(assets_dir(subfolder+f"/airl/learned_models"))
+    if not os.path.isdir(assets_dir(subfolder+f"/airl/reward_history")):
+        os.makedirs(assets_dir(subfolder+f"/airl/reward_history"))
+else:
+    if not os.path.isdir(assets_dir(subfolder+f"/gail/learned_models")):
+        os.makedirs(assets_dir(subfolder+f"/gail/learned_models"))
+    if not os.path.isdir(assets_dir(subfolder+f"/gail/reward_history")):
+        os.makedirs(assets_dir(subfolder+f"/gail/reward_history"))
 
 state_dim = env.observation_space.shape[0]
 is_disc_action = len(env.action_space.shape) == 0
@@ -254,20 +259,35 @@ def main_loop():
             print('{}\tT_sample {:.4f}\tT_update {:.4f}\texpert_R_avg {:.2f}\tR_avg {:.2f}'.format(
                 i_iter, log['sample_time'], t1-t0, log['avg_c_reward'], log['avg_reward']))
             rewards.append(log['avg_reward'])
-            pickle.dump(rewards, open(
-                os.path.join(assets_dir(subfolder), '{}/reward_history/{}.p'.format(args.alg,args.env_name
-                                            + str(args.seed))), 'wb'))
+            if args.reward_type == "airl":
+                pickle.dump(rewards, open(
+                os.path.join(assets_dir(subfolder), 'airl/reward_history/{}.p'.format( str(args.seed))), 'wb'))
+            else:
+                pickle.dump(rewards, open(
+                os.path.join(assets_dir(subfolder), 'gail/reward_history/{}.p'.format(str(args.seed))), 'wb'))
 
         if args.save_model_interval > 0 and (i_iter+1) % args.save_model_interval == 0:
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)
-            pickle.dump((policy_net, value_net, discrim_net), open(os.path.join(assets_dir(subfolder),
-                        '{}/learned_models/{}.p'.format(args.alg, args.env_name+ str(args.seed))), 'wb'))
+            if args.reward_type == "airl":
+                pickle.dump((policy_net, value_net, discrim_net), open(os.path.join(assets_dir(subfolder),
+                        'airl/learned_models/{}.p'.format(str(args.seed))), 'wb'))
+            else:
+                pickle.dump((policy_net, value_net, discrim_net), open(os.path.join(assets_dir(subfolder),
+                        'gail/learned_models/{}.p'.format(str(args.seed))), 'wb'))
+            
             if  log['avg_reward'] > best_reward:
                 print(best_reward)
-                pickle.dump((policy_net, value_net, discrim_net),
+                if args.reward_type == "airl":
+                    pickle.dump((policy_net, value_net, discrim_net),
                             open(os.path.join(assets_dir(subfolder),
-                                              '{}/learned_models/{}_best.p'.format( args.alg,
-                                                  args.env_name + str(args.seed))), 'wb'))
+                                              'airl/learned_models/{}_best.p'.format(
+                                                  str(args.seed))), 'wb'))
+                else:
+                    pickle.dump((policy_net, value_net, discrim_net),
+                            open(os.path.join(assets_dir(subfolder),
+                                              'gail/learned_models/{}_best.p'.format(
+                                                  str(args.seed))), 'wb'))
+
                 best_reward = copy.deepcopy(log['avg_reward'])
 
             to_device(device, policy_net, value_net, discrim_net)

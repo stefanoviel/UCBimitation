@@ -65,7 +65,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
                 next_state, reward, done, _ = env.step(action_to_play)
             else:
                 next_state, reward, done, _ = env.step(action)
-            reward_episode += reward
+            reward_episode += env.gamma**t*reward
             if running_state is not None:
                 next_state = running_state(next_state)
 

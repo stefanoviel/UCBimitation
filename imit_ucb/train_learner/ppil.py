@@ -66,7 +66,10 @@ if ( args.env_name == "gridworld-v0" or
     subfolder = "env"+str(args.env_name)+"type"+str(args.grid_type)+"noiseE"+str(args.noiseE)
     with open(assets_dir(subfolder+"/expert_trajs/"+args.expert_trajs), "rb") as f:
         data = pickle.load(f)
-
+if not os.path.isdir(assets_dir(subfolder+f"/ppil/learned_models")):
+    os.makedirs(assets_dir(subfolder+f"/ppil/learned_models"))
+if not os.path.isdir(assets_dir(subfolder+f"/ppil/reward_history")):
+    os.makedirs(assets_dir(subfolder+f"/ppil/reward_history"))
 state_dim = env.observation_space.shape[0]
 is_disc_action = len(env.action_space.shape) == 0
 assert(is_disc_action)
@@ -146,6 +149,7 @@ def run_ppil(K = 100, tau=5):
         actions_dataset = []
         next_states_dataset = []
         next_actions_dataset = []
+        rs = []
         for i in range(tau):
             states, actions, true_rewards, next_states, next_actions = collect_trajectories(value_params_list,  
                                                                 env 
@@ -156,8 +160,8 @@ def run_ppil(K = 100, tau=5):
             else:
                 states_traj_data.append(states)
                 actions_traj_data.append(actions)
-
-            print("Episode " + str(k) + ": " + str(np.sum(true_rewards)))
+            rs.append(np.sum(np.array([args.gamma**h for h in range(len(true_rewards))])*true_rewards))
+            print("Episode " + str(k) + ": " + str(rs[-1]))
             states_dataset = states_dataset + states
             actions_dataset = actions_dataset + actions
             next_states_dataset = next_states_dataset + next_states
@@ -201,15 +205,16 @@ def run_ppil(K = 100, tau=5):
             w = w + ( np.concatenate([states_dataset[sample3], action_features[actions_dataset[sample3]]])
                             -
                             expert_fev) #0.001
-            
-            
-
         
         value_params_list.append(theta)
         
-        plt.figure(k)
-        plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1], color="blue" )
-        plt.scatter(np.stack(data["states"][0])[:,0], np.stack(data["states"][0])[:,1],color="red")
-        plt.savefig("figs/"+ str(k) + "ppil.png")
+        # """ plt.figure(k)
+        # plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1], color="blue" )
+        # plt.scatter(np.stack(data["states"][0])[:,0], np.stack(data["states"][0])[:,1],color="red")
+        # plt """.savefig("figs/"+ str(k) + "ppil.png")
+    with open(assets_dir(subfolder+f"/ppil/reward_history/{args.seed}.pkl"), "wb") as f:
+            pickle.dump(np.array(rs), f)
+    with open(assets_dir(subfolder+f"/ppil/learned_models/{args.seed}.pkl"), "wb") as f:
+            pickle.dump(value_params_list, f)
         
 run_ppil()

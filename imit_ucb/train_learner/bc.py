@@ -62,7 +62,10 @@ if ( args.env_name == "gridworld-v0" or
     subfolder = "env"+str(args.env_name)+"type"+str(args.grid_type)+"noiseE"+str(args.noiseE)
     with open(assets_dir(subfolder+"/expert_trajs/"+args.expert_trajs), "rb") as f:
         data = pickle.load(f)
-
+if not os.path.isdir(assets_dir(subfolder+f"/bc/learned_models")):
+    os.makedirs(assets_dir(subfolder+f"/bc/learned_models"))
+if not os.path.isdir(assets_dir(subfolder+f"/bc/reward_history")):
+    os.makedirs(assets_dir(subfolder+f"/bc/reward_history"))
 state_dim = env.observation_space.shape[0]
 is_disc_action = len(env.action_space.shape) == 0
 assert(is_disc_action)
@@ -122,7 +125,13 @@ def run_bc():
             np.vstack(lsa))
     _, _, rewards, _, _ = collect_trajectories(policy, env)
 
+    rs = np.sum(np.array([args.gamma**h for h in range(len(rewards))])*rewards)
+    print(rs)
 
-    print(np.sum(rewards))
+    with open(assets_dir(subfolder+f"/bc/reward_history/{args.seed}.pkl"), "wb") as f:
+            pickle.dump(np.array([rs]), f)
+    with open(assets_dir(subfolder+f"/bc/learned_models/{args.seed}.pkl"), "wb") as f:
+            pickle.dump(policy, f)
+
         
 run_bc()

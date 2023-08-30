@@ -256,8 +256,7 @@ def main_loop():
             rewards.append(log['avg_reward'])
             pickle.dump(rewards, open(
                 os.path.join(assets_dir(subfolder),
-                             'reirl/reward_history/{}.p'.format(args.env_name
-                                                                + str(
+                             'reirl/reward_history/{}.p'.format(str(
                                  args.seed))), 'wb'))
         if args.save_model_interval > 0 and (
                 i_iter + 1) % args.save_model_interval == 0:
@@ -265,13 +264,13 @@ def main_loop():
             pickle.dump(policy_net,
                         open(os.path.join(assets_dir(subfolder),
                                           'reirl/learned_models/{}.p'.format(
-                                              args.env_name + str(args.seed))), 'wb'))
+                                              str(args.seed))), 'wb'))
             if log['avg_reward'] > best_reward:
                 print(best_reward)
                 pickle.dump(policy_net,
                             open(os.path.join(assets_dir(subfolder),
                                               'reirl/learned_models/{}_best.p'.format(
-                                                args.env_name + str(
+                                                str(
                                                 args.seed))), 'wb'))
                 best_reward = copy.deepcopy(log['avg_reward'])
 
