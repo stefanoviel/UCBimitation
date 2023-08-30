@@ -108,11 +108,23 @@ def collect_trajectories(policy, env):
     return states, actions, rewards, next_states, next_actions
 
 def run_bc():
-    policy = HistGradientBoostingClassifier(min_samples_leaf=1).fit(
-        np.array(data["states"])[:,:-1,:].reshape(-1, state_dim), 
-        np.array(data["actions"]).reshape(-1, 1))
-    import pdb; pdb.set_trace()
+    if args.noiseE == 0.0:
+        policy = HistGradientBoostingClassifier(min_samples_leaf=1).fit(
+            np.array(data["states"])[:,:-1,:].reshape(-1, state_dim), 
+            np.array(data["actions"]).reshape(-1, 1))
+        
+
+    else:
+        ls = []
+        lsa = []
+        for traj,traja in zip(data["states"],data["actions"]):
+            ls.append(traj[:-1])
+            lsa = lsa + traja
+        policy = HistGradientBoostingClassifier(min_samples_leaf=1).fit(
+            np.vstack(ls), 
+            np.vstack(lsa))
     _, _, rewards, _, _ = collect_trajectories(policy, env)
+
 
     print(np.sum(rewards))
         
