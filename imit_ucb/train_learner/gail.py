@@ -60,20 +60,13 @@ parser.add_argument('--reward-type', type=str, default="negative", metavar='N',
                            "input the discriminator output. Options: positive, negative, airl")
 parser.add_argument('--gpu-index', type=int, default=0, metavar='N')
 parser.add_argument('--noiseE', type=float, default=None, metavar='G')
-parser.add_argument('--noiseL', type=float, default=None, metavar='G')
 parser.add_argument('--grid-type', type=int, default=None, metavar='N')
-parser.add_argument('--mass-mulL', type=float, default=1.0, metavar='G',
-                    help="Mass Multiplier for learner environment")
-parser.add_argument('--len-mulL', type=float, default=1.0, metavar='G',
-                    help="Lenght Multiplier for learner environment")
-parser.add_argument('--mass-mulE', type=float, default=1.0, metavar='G',
-                    help="Mass multiplier for expert environment")
-parser.add_argument('--len-mulE', type=float, default=1.0, metavar='G',
-                    help="Lenght multiplier for expert environment")
+
 parser.add_argument('--scheduler-lr', action='store_true', default=False,
                     help='Use discriminator lr scheduler')
 parser.add_argument('--warm-up', action='store_true', default=False,
                     help='Discriminator Warm UP')
+parser.add_argument('--n-expert-trajs', type=int, default=2, metavar='N')
 args = parser.parse_args()
 
 dtype = torch.float64
@@ -152,10 +145,10 @@ state_only = True if (args.alg == "gaifo") else False
 
 if is_disc_action and (args.alg == "gail" or args.alg == "airl"):
     actions = data["actions"][0]
-    for l in data["actions"][1:]:
+    for l in data["actions"][1:args.n_expert_trajs]:
         actions = actions + l
     states = data["states"][0][:-1]
-    for l in data["states"][1:]:
+    for l in data["states"][1:args.n_expert_trajs]:
         states = states + l[:-1]
     
     one_hot_actions = to_categorical(actions, env.action_space.n)

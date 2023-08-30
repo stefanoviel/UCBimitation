@@ -48,6 +48,7 @@ parser.add_argument('--mass-mul', type=float, default=1.0, metavar='G',
 parser.add_argument('--len-mul', type=float, default=1.0, metavar='G',
                     help="Multiplier for CartPole and Acrobot lengths")
 parser.add_argument('--friction', default=False, action='store_true')
+parser.add_argument('--n-expert-trajs', type=int, default=2, metavar='N')
 args = parser.parse_args()
 
 dtype = torch.float64
@@ -75,20 +76,6 @@ running_state = lambda x: x #ZFilter((state_dim,), clip=5)
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 env.seed(args.seed)
-
-def compute_features_expectation(states,actions, env):
-    features = []
-    for traj_states, traj_actions in zip(states, actions):
-        h = 0
-        features_exp = 0
-        for state,action in zip(traj_states, traj_actions):
-            features_exp = features_exp + \
-                args.gamma**h * np.concatenate([state, np.eye(env.action_space.n)[action]])
-            h = h + 1
-        features.append(features_exp)
-    return (1 - args.gamma)*np.mean(features, axis=0)
-
-expert_fev = compute_features_expectation(data["states"], data["actions"],env)
 
 def collect_trajectories(value_params_list, env):
     state = env.reset()
@@ -135,7 +122,6 @@ def collect_trajectories(value_params_list, env):
 def run_iqlearn(K = 100, tau=1):
     theta = np.zeros(state_dim + env.action_space.n)
     value_params_list = [theta]
-    w = np.zeros(state_dim + env.action_space.n)
     action_features = np.eye(env.action_space.n)
     """create agent"""
     
@@ -164,7 +150,8 @@ def run_iqlearn(K = 100, tau=1):
         for _ in range(20): # before was 100
             gradient=0
             n = 0
-            for traj_state, traj_actions in zip(data["states"], data["actions"]):
+            for traj_state, traj_actions in zip(data["states"][:args.n_expert_trajs],
+                                                 data["actions"][:args.n_expert_trajs]):
                 for state, action, next_state in zip(traj_state[:-1],
                             traj_actions[:-1],
                             traj_state[1:]):

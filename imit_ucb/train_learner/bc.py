@@ -42,15 +42,11 @@ parser.add_argument('--log-interval', type=int, default=1, metavar='N',
 parser.add_argument('--save-model-interval', type=int, default=0, metavar='N',
                     help="interval between saving model (default: 0, means don't save)")
 parser.add_argument('--gpu-index', type=int, default=0, metavar='N')
+parser.add_argument('--n-expert-trajs', type=int, default=2, metavar='N')
 parser.add_argument('--noiseE', type=float, default=0.0, metavar='G')
 parser.add_argument('--grid-type', type=int, default=None, metavar='N')
-parser.add_argument('--mass-mul', type=float, default=1.0, metavar='G',
-                    help="Multiplier for CartPole and Acrobot masses")
-parser.add_argument('--len-mul', type=float, default=1.0, metavar='G',
-                    help="Multiplier for CartPole and Acrobot lengths")
-parser.add_argument('--friction', default=False, action='store_true')
-args = parser.parse_args()
 
+args = parser.parse_args()
 dtype = torch.float64
 torch.set_default_dtype(dtype)
 device = torch.device('cuda', index=args.gpu_index) if torch.cuda.is_available() else torch.device('cpu')
@@ -117,7 +113,8 @@ def run_bc():
     else:
         ls = []
         lsa = []
-        for traj,traja in zip(data["states"],data["actions"]):
+        for traj,traja in zip(data["states"][:args.n_expert_trajs],
+                                data["actions"][:args.n_expert_trajs]):
             ls.append(traj[:-1])
             lsa = lsa + traja
         policy = HistGradientBoostingClassifier(min_samples_leaf=1).fit(

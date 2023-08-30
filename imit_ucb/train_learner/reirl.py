@@ -69,6 +69,7 @@ parser.add_argument('--scheduler-lr', action='store_true', default=False,
                     help='Use discriminator lr scheduler')
 parser.add_argument('--warm-up', action='store_true', default=False,
                     help='Discriminator Warm UP')
+parser.add_argument('--n-expert-trajs', type=int, default=2, metavar='N')
 args = parser.parse_args()
 
 dtype = torch.float64
@@ -134,10 +135,10 @@ ppo_agent = Agent(env, policy_net, device, custom_reward=expert_reward,
 
 if is_disc_action:
     actions = data["actions"][0]
-    for l in data["actions"][1:]:
+    for l in data["actions"][1:args.n_expert_trajs]:
         actions = actions + l
     states = data["states"][0][:-1]
-    for l in data["states"][1:]:
+    for l in data["states"][1:args.n_expert_trajs]:
         states = states + l[:-1]
     
     one_hot_actions = to_categorical(actions, env.action_space.n)

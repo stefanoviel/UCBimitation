@@ -48,6 +48,7 @@ parser.add_argument('--mass-mul', type=float, default=1.0, metavar='G',
 parser.add_argument('--len-mul', type=float, default=1.0, metavar='G',
                     help="Multiplier for CartPole and Acrobot lengths")
 parser.add_argument('--friction', default=False, action='store_true')
+parser.add_argument('--n-expert-trajs', type=int, default=2, metavar='N')
 args = parser.parse_args()
 
 dtype = torch.float64
@@ -88,7 +89,8 @@ def compute_features_expectation(states,actions, env):
         features.append(features_exp)
     return (1 - args.gamma)*np.mean(features, axis=0)
 
-expert_fev = compute_features_expectation(data["states"], data["actions"],env)
+expert_fev = compute_features_expectation(data["states"][:args.n_expert_trajs],
+                                             data["actions"][args.n_expert_trajs],env)
 
 def collect_trajectories(value_params_list, env):
     state = env.reset()
