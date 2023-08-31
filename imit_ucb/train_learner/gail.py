@@ -244,6 +244,7 @@ def update_params(batch, i_iter):
     
 def main_loop():
     rewards = []
+    episodes = []
     best_reward = -10000
     for i_iter in range(args.max_iter_num):
         """generate multiple trajectories that reach the minimum batch_size"""
@@ -259,34 +260,45 @@ def main_loop():
             print('{}\tT_sample {:.4f}\tT_update {:.4f}\texpert_R_avg {:.2f}\tR_avg {:.2f}'.format(
                 i_iter, log['sample_time'], t1-t0, log['avg_c_reward'], log['avg_reward']))
             rewards.append(log['avg_reward'])
+            episodes.append(log['num_episodes'])
+            to_save = {"rewards": rewards,
+                        "episodes": episodes}
             if args.reward_type == "airl":
-                pickle.dump(rewards, open(
-                os.path.join(assets_dir(subfolder), 'airl/reward_history/{}.p'.format( str(args.seed))), 'wb'))
+                pickle.dump(to_save, open(
+                os.path.join(assets_dir(subfolder), 
+                                'airl/reward_history/{}_{}.p'.format( str(args.seed), 
+                                str(args.n_expert_trajs))), 'wb'))
             else:
-                pickle.dump(rewards, open(
-                os.path.join(assets_dir(subfolder), 'gail/reward_history/{}.p'.format(str(args.seed))), 'wb'))
+                pickle.dump(to_save, open(
+                os.path.join(assets_dir(subfolder), 
+                            'gail/reward_history/{}_{}.p'.format(str(args.seed),
+                            str(args.n_expert_trajs))), 'wb'))
 
         if args.save_model_interval > 0 and (i_iter+1) % args.save_model_interval == 0:
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)
             if args.reward_type == "airl":
                 pickle.dump((policy_net, value_net, discrim_net), open(os.path.join(assets_dir(subfolder),
-                        'airl/learned_models/{}.p'.format(str(args.seed))), 'wb'))
+                        'airl/learned_models/{}_{}.p'.format(str(args.seed),
+                        str(args.n_expert_trajs))), 'wb'))
             else:
                 pickle.dump((policy_net, value_net, discrim_net), open(os.path.join(assets_dir(subfolder),
-                        'gail/learned_models/{}.p'.format(str(args.seed))), 'wb'))
+                        'gail/learned_models/{}_{}.p'.format(str(args.seed),
+                        str(args.n_expert_trajs))), 'wb'))
             
             if  log['avg_reward'] > best_reward:
                 print(best_reward)
                 if args.reward_type == "airl":
                     pickle.dump((policy_net, value_net, discrim_net),
                             open(os.path.join(assets_dir(subfolder),
-                                              'airl/learned_models/{}_best.p'.format(
-                                                  str(args.seed))), 'wb'))
+                                              'airl/learned_models/{}_{}_best.p'.format(
+                                                  str(args.seed),
+                                                  str(args.n_expert_trajs))), 'wb'))
                 else:
                     pickle.dump((policy_net, value_net, discrim_net),
                             open(os.path.join(assets_dir(subfolder),
-                                              'gail/learned_models/{}_best.p'.format(
-                                                  str(args.seed))), 'wb'))
+                                              'gail/learned_models/{}_{}_best.p'.format(
+                                                  str(args.seed),
+                                                  str(args.n_expert_trajs))), 'wb'))
 
                 best_reward = copy.deepcopy(log['avg_reward'])
 

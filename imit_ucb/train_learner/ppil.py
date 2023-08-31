@@ -26,7 +26,7 @@ parser.add_argument('--expert-trajs', metavar='G',
                     help='path to expert data')
 parser.add_argument('--render', action='store_true', default=False,
                     help='render the environment')
-parser.add_argument('--eta', type=float, default=100.0, metavar='G',
+parser.add_argument('--eta', type=float, default=1.0, metavar='G',
                     help='log std for the policy (default: -0.0)')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
                     help='discount factor (default: 0.99)')
@@ -93,7 +93,7 @@ def compute_features_expectation(states,actions, env):
     return (1 - args.gamma)*np.mean(features, axis=0)
 
 expert_fev = compute_features_expectation(data["states"][:args.n_expert_trajs],
-                                             data["actions"][args.n_expert_trajs],env)
+                                             data["actions"][:args.n_expert_trajs],env)
 
 def collect_trajectories(value_params_list, env):
     state = env.reset()
@@ -137,7 +137,7 @@ def collect_trajectories(value_params_list, env):
         next_actions.append(action)
     return states, actions, rewards, next_states, next_actions
 
-def run_ppil(K = 100, tau=5):
+def run_ppil(K, tau=5):
     theta = np.zeros(state_dim + env.action_space.n)
     value_params_list = [theta]
     w = np.zeros(state_dim + env.action_space.n)
@@ -212,9 +212,9 @@ def run_ppil(K = 100, tau=5):
         # plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1], color="blue" )
         # plt.scatter(np.stack(data["states"][0])[:,0], np.stack(data["states"][0])[:,1],color="red")
         # plt """.savefig("figs/"+ str(k) + "ppil.png")
-    with open(assets_dir(subfolder+f"/ppil/reward_history/{args.seed}.pkl"), "wb") as f:
+    with open(assets_dir(subfolder+f"/ppil/reward_history/{args.seed}_{args.n_expert_trajs}.p"), "wb") as f:
             pickle.dump(np.array(rs), f)
-    with open(assets_dir(subfolder+f"/ppil/learned_models/{args.seed}.pkl"), "wb") as f:
+    with open(assets_dir(subfolder+f"/ppil/learned_models/{args.seed}_{args.n_expert_trajs}.p"), "wb") as f:
             pickle.dump(value_params_list, f)
         
-run_ppil()
+run_ppil(args.max_iter_num)

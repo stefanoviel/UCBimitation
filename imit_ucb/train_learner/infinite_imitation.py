@@ -92,7 +92,8 @@ def compute_features_expectation(states,actions, env):
         features.append(features_exp)
     return np.mean(features, axis=0)
 
-expert_fev = compute_features_expectation(data["states"], data["actions"],env)
+expert_fev = compute_features_expectation(data["states"][:args.n_expert_trajs],
+                                             data["actions"][:args.n_expert_trajs],env)
 
 def collect_trajectories(value_params_list, reward_weights, env, covariance_inv):
     state = env.reset()
@@ -144,7 +145,7 @@ def compute_bonus(state, covariance_inv):
         bonus.append(np.sqrt(feature.dot(covariance_inv).dot(feature)))
     return np.array(bonus)
 
-def run_imitation_learning(K = 100, tau=5):
+def run_imitation_learning(K, tau=5):
     value_params = np.zeros(state_dim + env.action_space.n)
     value_params_list = [value_params]
     w = np.zeros(state_dim + env.action_space.n)
@@ -207,11 +208,11 @@ def run_imitation_learning(K = 100, tau=5):
         # plt.scatter(np.stack(states)[:,0], np.stack(states)[:,1], color="blue" )
         # plt.scatter(np.stack(data["states"][0])[:,0], np.stack(data["states"][0])[:,1],color="red")
         # plt.savefig("figs/"+ str(k) + "imit.png")
-    with open(assets_dir(subfolder+f"/ilarl/reward_history/{args.seed}.pkl"), "wb") as f:
+    with open(assets_dir(subfolder+f"/ilarl/reward_history/{args.seed}_{args.n_expert_trajs}.p"), "wb") as f:
         pickle.dump(np.array(rs), f)
-    with open(assets_dir(subfolder+f"/ilarl/learned_models/{args.seed}.pkl"), "wb") as f:
+    with open(assets_dir(subfolder+f"/ilarl/learned_models/{args.seed}_{args.n_expert_trajs}.p"), "wb") as f:
         pickle.dump({"thetas": value_params_list,
                      "covariance": covariance_inv}, 
                     f)
         
-run_imitation_learning()
+run_imitation_learning(args.max_iter_num)

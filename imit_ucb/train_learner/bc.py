@@ -128,9 +128,9 @@ def run_bc():
     rs = np.sum(np.array([args.gamma**h for h in range(len(rewards))])*rewards)
     print(rs)
 
-    with open(assets_dir(subfolder+f"/bc/reward_history/{args.seed}.pkl"), "wb") as f:
+    with open(assets_dir(subfolder+f"/bc/reward_history/{args.seed}_{args.n_expert_trajs}.p"), "wb") as f:
             pickle.dump(np.array([rs]), f)
-    with open(assets_dir(subfolder+f"/bc/learned_models/{args.seed}.pkl"), "wb") as f:
+    with open(assets_dir(subfolder+f"/bc/learned_models/{args.seed}_{args.n_expert_trajs}.p"), "wb") as f:
             pickle.dump(policy, f)
 
         

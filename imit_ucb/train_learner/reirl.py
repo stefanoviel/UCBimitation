@@ -239,6 +239,7 @@ def update_params(batch, i_iter, opt):
                     
 def main_loop():
     rewards = []
+    episodes = []
     best_reward = -10000
 
     for i_iter in range(args.max_iter_num):
@@ -254,24 +255,28 @@ def main_loop():
                     i_iter, log['sample_time'], t1 - t0, log['avg_c_reward'],
                     log['avg_reward']))
             rewards.append(log['avg_reward'])
-            pickle.dump(rewards, open(
+            episodes.append(log['num_episodes'])
+            to_save = {"rewards": rewards,
+                        "episodes": episodes}
+            pickle.dump(to_save, open(
                 os.path.join(assets_dir(subfolder),
-                             'reirl/reward_history/{}.p'.format(str(
-                                 args.seed))), 'wb'))
+                             'reirl/reward_history/{}_{}.p'.format(str(
+                                 args.seed), str(args.n_expert_trajs))), 'wb'))
         if args.save_model_interval > 0 and (
                 i_iter + 1) % args.save_model_interval == 0:
             to_device(torch.device('cpu'), policy_net)
             pickle.dump(policy_net,
                         open(os.path.join(assets_dir(subfolder),
-                                          'reirl/learned_models/{}.p'.format(
-                                              str(args.seed))), 'wb'))
+                                          'reirl/learned_models/{}_{}.p'.format(
+                                              str(args.seed), 
+                                              str(args.n_expert_trajs))), 'wb'))
             if log['avg_reward'] > best_reward:
                 print(best_reward)
                 pickle.dump(policy_net,
                             open(os.path.join(assets_dir(subfolder),
-                                              'reirl/learned_models/{}_best.p'.format(
-                                                str(
-                                                args.seed))), 'wb'))
+                                              'reirl/learned_models/{}_{}_best.p'.format(
+                                                str(args.seed),
+                                                str(args.n_expert_trajs))), 'wb'))
                 best_reward = copy.deepcopy(log['avg_reward'])
 
             to_device(device, policy_net)

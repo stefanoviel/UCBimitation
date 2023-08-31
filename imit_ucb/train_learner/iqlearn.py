@@ -26,7 +26,7 @@ parser.add_argument('--expert-trajs', metavar='G',
                     help='path to expert data')
 parser.add_argument('--render', action='store_true', default=False,
                     help='render the environment')
-parser.add_argument('--eta', type=float, default=100.0, metavar='G',
+parser.add_argument('--eta', type=float, default=1.0, metavar='G',
                     help='log std for the policy (default: -0.0)')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
                     help='discount factor (default: 0.99)')
@@ -122,7 +122,7 @@ def collect_trajectories(value_params_list, env):
         next_actions.append(action)
     return states, actions, rewards, next_states, next_actions
 
-def run_iqlearn(K = 100, tau=1):
+def run_iqlearn(K, tau=1):
     theta = np.zeros(state_dim + env.action_space.n)
     value_params_list = [theta]
     action_features = np.eye(env.action_space.n)
@@ -204,9 +204,9 @@ def run_iqlearn(K = 100, tau=1):
         # plt.scatter(np.stack(data["states"][0])[:,0], np.stack(data["states"][0])[:,1],color="red")
         # plt.savefig("figs/"+ str(k) + "iqlearn.png")
 
-    with open(assets_dir(subfolder+f"/iqlearn/reward_history/{args.seed}.pkl"), "wb") as f:
+    with open(assets_dir(subfolder+f"/iqlearn/reward_history/{args.seed}_{args.n_expert_trajs}.p"), "wb") as f:
         pickle.dump(np.array(rs), f)
-    with open(assets_dir(subfolder+f"/iqlearn/learned_models/{args.seed}.pkl"), "wb") as f:
+    with open(assets_dir(subfolder+f"/iqlearn/learned_models/{args.seed}_{args.n_expert_trajs}.p"), "wb") as f:
         pickle.dump(value_params_list, f)
         
-run_iqlearn()
+run_iqlearn(args.max_iter_num)
