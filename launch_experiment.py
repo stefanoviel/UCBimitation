@@ -11,7 +11,7 @@ n_trajs = [2] if args.noiseE == 0.0 else [1,2,3,5,10]
 expert_f = "trajs16.pkl" if args.noiseE == 0.0 else "trajs6.pkl" if args.noiseE == 0.05 else "trajs30.pkl"
 for seed in range(0,5):
     for n in n_trajs:
-        string = f" python train_learner/{args.alg}.py \
+        string = f" python imit_ucb/train_learner/{args.alg}.py \
             --env-name DiscreteGaussianGridworld-v0  --expert-trajs {expert_f} \
             --num-threads 1 --max-iter-num 30 \
             --save-model-interval 10 --grid-type 1 --noiseE 0.0 \

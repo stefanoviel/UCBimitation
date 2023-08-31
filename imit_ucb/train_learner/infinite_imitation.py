@@ -1,6 +1,5 @@
 import argparse
 import gym
-import gym_simple
 import my_gym
 from scipy import special
 import os
