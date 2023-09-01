@@ -20,7 +20,7 @@ for seed in range(0,5):
             string = f" python imit_ucb/train_learner/gail.py \
             --env-name DiscreteGaussianGridworld-v0  --expert-trajs {expert_f} \
             --num-threads 1 --max-iter-num 30 \
-            --save-model-interval 10 --grid-type 1 --noiseE 0.0 \
+            --save-model-interval 10 --grid-type 1 --noiseE {args.noiseE} \
                 --n-expert-trajs {n} --seed {seed} --reward-type airl"
         elif args.alg == "infinite_imitation":
             string = f"{string} --beta 8"
