@@ -127,12 +127,12 @@ def run_iqlearn(K, tau=1):
     action_features = np.eye(env.action_space.n)
     """create agent"""
     
+    rs = []
     for k in range(K):
         states_dataset = []
         actions_dataset = []
         next_states_dataset = []
         next_actions_dataset = []
-        rs = []
         for i in range(tau):
             states, actions, true_rewards, next_states, next_actions = collect_trajectories(value_params_list,  
                                                                 env 

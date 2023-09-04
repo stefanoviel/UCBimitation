@@ -142,13 +142,12 @@ def run_ppil(K, tau=5):
     w = np.zeros(state_dim + env.action_space.n)
     action_features = np.eye(env.action_space.n)
     """create agent"""
-    
+    rs = []
     for k in range(K):
         states_dataset = []
         actions_dataset = []
         next_states_dataset = []
         next_actions_dataset = []
-        rs = []
         for i in range(tau):
             states, actions, true_rewards, next_states, next_actions = collect_trajectories(value_params_list,  
                                                                 env 

@@ -152,12 +152,11 @@ def run_imitation_learning(K, tau=5):
     action_features = np.eye(env.action_space.n)
     covariance_inv = 1/8e-2*np.eye(state_dim + env.action_space.n)
     """create agent"""
-    
+    rs=[]
     for k in range(K):
         states_dataset = []
         actions_dataset = []
         next_states_dataset = []
-        rs=[]
         for i in range(tau):
             states, actions, true_rewards, next_states = collect_trajectories(value_params_list, 
                                                                 reward_weights, 
