@@ -65,7 +65,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
                 next_state, reward, done, _ = env.step(action_to_play)
             else:
                 next_state, reward, done, _ = env.step(action)
-            reward_episode += env.gamma**t*reward
+            reward_episode += reward #env.gamma**t*reward
             if running_state is not None:
                 next_state = running_state(next_state)
 
@@ -88,6 +88,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
             if render:
                 env.render()
             if done:
+                print("done")
                 if opponent_policy is not None:
                     memory.push(next_state, player_action, opponent_action, action,
                                 mask, next_state, reward)

@@ -146,7 +146,8 @@ def run_lsvi_ucb(K = 100):
     
     for k in range(K):
         states, actions, rewards = collect_trajectories(value_params, env, covariance_inv )
-        print("Episode " + str(k) + ": " + str(np.sum(rewards)))
+        gammas = np.array([env.gamma**h for h in range(len(rewards))])
+        print("Episode " + str(k) + ": " + str(np.sum(gammas*rewards)))
         states_dataset = states_dataset + states
         actions_dataset = actions_dataset + actions
         rewards_dataset = rewards_dataset + rewards
@@ -161,8 +162,8 @@ def run_lsvi_ucb(K = 100):
             #     plt.figure(k)
             #     plt.scatter(np.stack(states_to_app)[:,0], np.stack(states_to_app)[:,1] )
             #     plt.savefig("figs/"+ str(k) + ".png")
-        with open(assets_dir(subfolder+"/expert_trajs")+"/trajs"+str(k)+".pkl", "wb") as f:
-            pickle.dump({"states": states_to_save, "actions": actions_to_save}, f)
+        #with open(assets_dir(subfolder+"/expert_trajs")+"/trajs"+str(k)+".pkl", "wb") as f:
+        #    pickle.dump({"states": states_to_save, "actions": actions_to_save}, f)
         covariance = compute_covariance(states_dataset, actions_dataset)
         covariance_inv = np.linalg.inv(covariance)
         targets_dataset = []

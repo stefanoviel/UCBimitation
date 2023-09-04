@@ -16,9 +16,9 @@ class DiscretePolicy(nn.Module):
 
         self.affine_layers = nn.ModuleList()
         last_dim = state_dim
-        for nh in hidden_size:
-            self.affine_layers.append(nn.Linear(last_dim, nh))
-            last_dim = nh
+        #for nh in hidden_size:
+        #    self.affine_layers.append(nn.Linear(last_dim, nh))
+        #    last_dim = nh
 
         self.action_head = nn.Linear(last_dim, action_num)
         self.action_head.weight.data.mul_(0.1)
