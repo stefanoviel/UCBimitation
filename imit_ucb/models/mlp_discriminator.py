@@ -14,9 +14,9 @@ class Discriminator(nn.Module):
 
         self.affine_layers = nn.ModuleList()
         last_dim = num_inputs
-        for nh in hidden_size:
-            self.affine_layers.append(nn.Linear(last_dim, nh))
-            last_dim = nh
+        #for nh in hidden_size:
+        #    self.affine_layers.append(nn.Linear(last_dim, nh))
+        #    last_dim = nh
 
         self.logic = nn.Linear(last_dim, 1)
         self.logic.weight.data.mul_(0.1)

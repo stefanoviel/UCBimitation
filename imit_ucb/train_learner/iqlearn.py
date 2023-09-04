@@ -144,7 +144,7 @@ def run_iqlearn(K, tau=1):
                 states_traj_data.append(states)
                 actions_traj_data.append(actions)
 
-            rs.append(np.sum(np.array([args.gamma**h for h in range(len(true_rewards))])*true_rewards))
+            rs.append(np.sum(np.array([1**h for h in range(len(true_rewards))])*true_rewards))
             print("Episode " + str(k) + ": " + str(rs[-1]))
             states_dataset = states_dataset + states
             actions_dataset = actions_dataset + actions
