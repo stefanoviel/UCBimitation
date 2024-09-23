@@ -1,6 +1,5 @@
 import argparse
 import gym
-import gym_simple
 import my_gym
 import os
 import sys
@@ -89,7 +88,7 @@ running_state = lambda x: x #ZFilter((state_dim,), clip=5)
 """seeding"""
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
-env.seed(args.seed)
+# env.seed(args.seed)  # TODO: fix seeding
 
 def collect_trajectories(value_params, env, covariance_inv):
     state = env.reset()

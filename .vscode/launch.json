@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Run train_expert.lsvi_ucb",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/train_expert/lsvi_ucb.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+            },
+            "args": []
+        }
+    ]
+}
