@@ -1,0 +1,6 @@
+do i need to understand the already implemented algos?
+which environment should I start with? 
+why my_gym is into another folder called my_gym? 
+what does the number near trajs stands for?
+what is this noise parameter? it's the noise in the environment
+what are the number in reward and models (i.e. 1_2.p)? I run with different parameters and it produces different ones??
