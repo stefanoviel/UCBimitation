@@ -175,8 +175,6 @@ def expert_reward(state, next, reward_type):
             return math.log(1 - torch.sigmoid(discrim_net(input_discrim))[0].item()  + 1e-8)
         if reward_type == "positive":
             return -math.log(torch.sigmoid(discrim_net(input_discrim))[0].item() + 1e-8)
-        
-
 """create agent"""
 agent = Agent(env, policy_net, device, custom_reward=expert_reward,
               running_state=running_state, render=args.render, num_threads=args.num_threads,

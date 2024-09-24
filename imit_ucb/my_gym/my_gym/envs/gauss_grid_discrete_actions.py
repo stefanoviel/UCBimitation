@@ -7,11 +7,14 @@ import copy
 import random
 from scipy import sparse
 
+# TODO: which environemnt should I use
+
 class TabularEnv(gym.Env):
     metadata = {
         'render.modes': ['human', 'rgb_array'],
         'video.frames_per_second': 30
     }
+
 
     def __init__(self, prop):
 
@@ -58,7 +61,6 @@ class TabularEnv(gym.Env):
         # Stochastic transitions
         self.prop_random_actions = prop
 
-# TODO: which environment should I use? DiscreteContinuousGridWorld or DiscreteGaussianGridWorld ? Crazy landscape or simple? 
 class DiscreteContinuousGridWorld(TabularEnv):
     def __init__(self, env_type=0, prop=0):
         # Characteristics of the gridworld
@@ -68,7 +70,7 @@ class DiscreteContinuousGridWorld(TabularEnv):
         self.state=None
         self.prop=prop
         self.env_type=env_type
-        self.np_random = np.random.default_rng()
+        self.seed()
         self.reset()
         self.steps_from_last_reset=0
         if env_type == 0:
@@ -77,30 +79,47 @@ class DiscreteContinuousGridWorld(TabularEnv):
             self.terminal_area = np.array([[0.95, 1.0],[-1.0, -0.95]])
 
     def step(self, a):
-        self.state += self._action_to_direction[a] + self.prop * self.np_random.uniform(-0.1, 0.1, size=2)
-        self.state = np.clip(self.state, -1, 1)
-        
+        self.state += self._action_to_direction[a] + self.prop*np.random.uniform(-0.1, 0.1, size=2)
+        self.state[0] = np.max([np.min([1,self.state[0]]),-1])
+        self.state[1] = np.max([np.min([1, self.state[1]]), -1])
+        if (self.terminal_area[0,0] <= self.state[0]  <= self.terminal_area[0,1] and
+            self.terminal_area[1,0] <= self.state[1]  <= self.terminal_area[1,1]):
+            self.done = True
         reward = self.compute_reward()
         self.steps_from_last_reset += 1
-        
-        terminated = (self.terminal_area[0,0] <= self.state[0] <= self.terminal_area[0,1] and
-                      self.terminal_area[1,0] <= self.state[1] <= self.terminal_area[1,1])
-        truncated = self.steps_from_last_reset >= 5000
-        
-        self.done = terminated or truncated
-        
-        return self._get_obs(), reward, terminated, truncated, {}
-    
-    def _get_obs(self):
-        return np.array([
-            self.state[0],
-            self.state[1],
-            self.state[0]**2,
-            self.state[1]**2,
-            (1 / (self.state[0]**2 + self.state[1]**2 + 1e-8))**2,
-            10.0 * float(self.done)
-        ])
-
+        if self.steps_from_last_reset == 5000:
+            self.done = True
+            return np.array([self.state[0],
+                             self.state[1],
+                             # self.state[0]*self.state[1],
+                             self.state[0] ** 2,
+                             self.state[1] ** 2,
+                             # self.state[0] ** 3,
+                             # self.state[1] ** 3,
+                             (1 / (self.state[0] ** 2
+                                            + self.state[1] ** 2
+                                            + 1e-8)) ** 2,
+                             0.0
+                             ]
+                            ), \
+                   reward, \
+                   self.done, \
+                   {}
+        return np.array([self.state[0],
+                        self.state[1],
+                        #self.state[0]*self.state[1],
+                        self.state[0]**2,
+                        self.state[1]**2,
+                        #self.state[0] ** 3,
+                        #self.state[1] ** 3,
+                        (1 / (self.state[0] ** 2
+                               + self.state[1] ** 2
+                               + 1e-8)) ** 2,
+                        10.*float(self.done)]
+                        ), \
+               reward, \
+               self.done, \
+               {}
 
     def reset(self, starting_index = None):
         if self.env_type == 0:
@@ -141,6 +160,8 @@ class DiscreteContinuousGridWorld(TabularEnv):
                 reward += 100
         return reward
 
+
+
 class DiscreteGaussianGridWorld(TabularEnv):
     def __init__(self, env_type=0, prop=0):
         # Characteristics of the gridworld
@@ -150,7 +171,7 @@ class DiscreteGaussianGridWorld(TabularEnv):
         self.state=None
         self.prop=prop
         self.env_type=env_type
-        self.np_random = np.random.default_rng()
+        self.seed()
         self.reset()
         self.steps_from_last_reset=0
         if env_type == 0:
@@ -159,33 +180,63 @@ class DiscreteGaussianGridWorld(TabularEnv):
             self.terminal_area = np.array([[0.95, 1.0],[-1.0, -0.95]])
 
     def step(self, a):
+        #print(a, "action")
         reward = self.compute_reward()
+        if self.done:
+            return np.array([self.state[0],
+                        self.state[1],
+                        self.state[0]*self.state[1],
+                        self.state[0]**2,
+                        self.state[1]**2,
+                        1,
+                        #self.state[0] ** 3,
+                        #self.state[1] ** 3,
+                        8*np.exp(-8*self.state[0]**2-8*self.state[1]**2),
+                        float(self.done)
+                        ]
+                        ), \
+               reward, \
+               self.done, \
+               {}
         
-        if not self.done:
-            self.state += self._action_to_direction[a] + self.prop * self.np_random.uniform(-0.1, 0.1, size=2)
-            self.state = np.clip(self.state, -1, 1)
-            
-            self.steps_from_last_reset += 1
+        self.state += self._action_to_direction[a] + self.prop*np.random.uniform(-0.1, 0.1, size=2)
+        self.state[0] = np.max([np.min([1,self.state[0]]),-1])
+        self.state[1] = np.max([np.min([1, self.state[1]]), -1])
+        if (self.terminal_area[0,0] <= self.state[0]  <= self.terminal_area[0,1] and
+            self.terminal_area[1,0] <= self.state[1]  <= self.terminal_area[1,1]):
+            self.done = True
         
-        terminated = (self.terminal_area[0,0] <= self.state[0] <= self.terminal_area[0,1] and
-                      self.terminal_area[1,0] <= self.state[1] <= self.terminal_area[1,1])
-        truncated = self.steps_from_last_reset >= 5000
-        
-        self.done = terminated or truncated
-        
-        return self._get_obs(), reward, terminated, truncated, {}
-    
-    def _get_obs(self):
-        return np.array([
-            self.state[0],
-            self.state[1],
-            self.state[0] * self.state[1],
-            self.state[0]**2,
-            self.state[1]**2,
-            1,
-            8 * np.exp(-8 * self.state[0]**2 - 8 * self.state[1]**2),
-            float(self.done)
-        ])
+        self.steps_from_last_reset += 1
+        """ if self.steps_from_last_reset == 5000:
+            self.done = True
+            return np.array([self.state[0],
+                             self.state[1],
+                             # self.state[0]*self.state[1],
+                             self.state[0] ** 2,
+                             self.state[1] ** 2,
+                             # self.state[0] ** 3,
+                             # self.state[1] ** 3,
+                             8*np.exp(-8*self.state[0]**2-8*self.state[1]**2),
+                             0.0]
+                            ), \
+                   reward, \
+                   self.done, \
+                   None """
+        return np.array([self.state[0],
+                        self.state[1],
+                        self.state[0]*self.state[1],
+                        self.state[0]**2,
+                        self.state[1]**2,
+                        1,
+                        #self.state[0] ** 3,
+                        #self.state[1] ** 3,
+                        8*np.exp(-8*self.state[0]**2-8*self.state[1]**2),
+                        float(self.done)
+                        ]
+                        ), \
+               reward, \
+               self.done, \
+               {} # TODO: changed this from none to empty dict, before it was generating an error
 
     def reset(self, starting_index = None):
         if self.env_type == 0:
@@ -206,9 +257,7 @@ class DiscreteGaussianGridWorld(TabularEnv):
                         float(self.done)
                         ]
                         )
-    
     def compute_reward(self):
-        print("env type", self.env_type)
         if self.env_type==0:
             if (self.terminal_area[0,0] <= self.state[0]  <= self.terminal_area[0,1] and
             self.terminal_area[1,0] <= self.state[1]  <= self.terminal_area[1,1]):
