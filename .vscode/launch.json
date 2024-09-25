@@ -2,16 +2,16 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Run train_expert.lsvi_ucb",
+            "name": "Python Debugger: Run plotting.plot",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/train_expert/lsvi_ucb.py",
+            "module": "plotting.plot",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/imit_ucb",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+                "PYTHONPATH": "${workspaceFolder}:imit_ucb:${env:PYTHONPATH}"
             },
-            "args": []
+            "args": ["--noiseE", "0.0"]
         }
     ]
 }
