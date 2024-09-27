@@ -168,6 +168,9 @@ class DiscreteGaussianGridWorld(TabularEnv):
 
         TabularEnv.__init__(self, prop)
         self.env_type = env_type
+        # env_type 0: Random start within grid, terminal area in lower-left quadrant, reward focuses on reaching terminal area and minimizing distance from origin, large reward when terminal area is reached.
+        # env_type 1: Fixed start at (-1, 1), terminal area in upper-right quadrant, reward focuses on minimizing distance from (1, -1), additional reward for reaching terminal area.
+        
         self.state=None
         self.prop=prop
         self.env_type=env_type
