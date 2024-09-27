@@ -74,25 +74,40 @@ is_disc_action = len(env.action_space.shape) == 0
 assert(is_disc_action)
 running_state = lambda x: x #ZFilter((state_dim,), clip=5)
 # running_reward = ZFilter((1,), demean=False, clip=10)
+
 """seeding"""
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 env.seed(args.seed)
 
 def compute_features_expectation(states,actions, env):
+    """compute an expectation over the feature discounted with gamma, use to compute the reward"""
     features = []
     for traj_states, traj_actions in zip(states[:args.n_expert_trajs], actions[:args.n_expert_trajs]):
         h = 0
         features_exp = 0
         for state,action in zip(traj_states, traj_actions):
-            features_exp = features_exp + \
-                args.gamma**h * np.concatenate([state, np.eye(env.action_space.n)[action]])
+            features_exp = features_exp + args.gamma**h * np.concatenate([state, np.eye(env.action_space.n)[action]])
             h = h + 1
         features.append(features_exp)
     return np.mean(features, axis=0)
 
-expert_fev = compute_features_expectation(data["states"][:args.n_expert_trajs],
-                                             data["actions"][:args.n_expert_trajs],env)
+def compute_covariance(states_dataset, actions_dataset):
+    features = []
+    covariance = 1/8e-2*np.eye(state_dim + env.action_space.n)
+    for state,action in zip(states_dataset, actions_dataset):
+        features.append(np.concatenate([state, np.eye(env.action_space.n)[action]]))
+    for feature in features:
+        covariance += np.outer(feature, feature)
+    return covariance
+
+def compute_bonus(state, covariance_inv):
+    """this is the estimation of the uncertainty"""
+    bonus = []
+    for a in range(env.action_space.n):
+        feature = np.concatenate([state, np.eye(env.action_space.n)[a]])
+        bonus.append(np.sqrt(feature.dot(covariance_inv).dot(feature)))
+    return np.array(bonus)
 
 def collect_trajectories(value_params_list, reward_weights, env, covariance_inv):
     state = env.reset()
@@ -106,6 +121,8 @@ def collect_trajectories(value_params_list, reward_weights, env, covariance_inv)
     while h < 1e4 and not done:
         bonus = compute_bonus(state,covariance_inv)
         sum = 0
+
+        # iterating over all the features to get a distribution of the actions which is influenced by all the features
         for value_params, w in zip(value_params_list,reward_weights):
             value = value_params.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
             r = w.dot(np.vstack([state.reshape(-1,1).repeat(4, axis=1), action_features ]))
@@ -120,6 +137,7 @@ def collect_trajectories(value_params_list, reward_weights, env, covariance_inv)
         rewards.append(reward)
         state = next_state 
         h = h + 1
+
     print(done)
     if done:
         states.append(state)
@@ -129,20 +147,6 @@ def collect_trajectories(value_params_list, reward_weights, env, covariance_inv)
         next_states.append(next_state)
     return states, actions, rewards, next_states
 
-def compute_covariance(states_dataset, actions_dataset):
-    features = []
-    covariance = 1/8e-2*np.eye(state_dim + env.action_space.n)
-    for state,action in zip(states_dataset, actions_dataset):
-        features.append(np.concatenate([state, np.eye(env.action_space.n)[action]]))
-    for feature in features:
-        covariance += np.outer(feature, feature)
-    return covariance
-def compute_bonus(state, covariance_inv):
-    bonus = []
-    for a in range(env.action_space.n):
-        feature = np.concatenate([state, np.eye(env.action_space.n)[a]])
-        bonus.append(np.sqrt(feature.dot(covariance_inv).dot(feature)))
-    return np.array(bonus)
 
 def run_imitation_learning(K, tau=5):
     value_params = np.zeros(state_dim + env.action_space.n)
@@ -161,7 +165,7 @@ def run_imitation_learning(K, tau=5):
             states, actions, true_rewards, next_states = collect_trajectories(value_params_list, 
                                                                 reward_weights, 
                                                                 env, 
-                                                                covariance_inv )
+                                                                covariance_inv)
             if i == 0:
                 states_traj_data = [states]
                 actions_traj_data = [actions]
@@ -174,16 +178,19 @@ def run_imitation_learning(K, tau=5):
             states_dataset = states_dataset + states
             actions_dataset = actions_dataset + actions
             next_states_dataset = next_states_dataset + next_states
+            
         reward_weights = []
         for i in range(tau):
-            
-            w = w - \
-                0.001*(compute_features_expectation(states_traj_data,actions_traj_data,env) - expert_fev)
+            # TODO: why do you compute the expectation over the features, I guess this is similar to comparing the occupancy measures
+            # if the features for action and states are the same the reward will also be the same? 
+            w = w - 0.001*(compute_features_expectation(states_traj_data,actions_traj_data,env) - expert_fev)
             reward_weights.append(w)
+
         covariance = compute_covariance(states_dataset, actions_dataset)
         covariance_inv = np.linalg.inv(covariance)
         targets_dataset = []
         value_params_list = []
+        
         for i in range(tau):
             for state, next_state in zip(states_dataset, next_states_dataset):
                 reward = reward_weights[i].dot(
@@ -213,4 +220,8 @@ def run_imitation_learning(K, tau=5):
                      "covariance": covariance_inv}, 
                     f)
         
-run_imitation_learning(args.max_iter_num)
+
+if __name__ == "__main__":
+    expert_fev = compute_features_expectation(data["states"][:args.n_expert_trajs],
+                                                data["actions"][:args.n_expert_trajs],env)
+    run_imitation_learning(args.max_iter_num)
