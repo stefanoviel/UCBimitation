@@ -26,23 +26,26 @@ colors = {"ppil": "green",
             "airl":"gray",
             "reirl":"darkcyan"}
 
-algs = ["gail"]
-colors = {  "gail":"brown"}
+algs = ["gail", "ilarl"]
+colors = {  "gail":"brown",  "ilarl":"blue"}
 
 for alg in algs:
     print('alg',alg)
     to_plot_x = []
     to_plot_y = []
     for seed in range(0,5):
-        with open(assets_dir(subfolder+f"/{alg}/reward_history/{seed}_{args.n_expert_trajs}.p"), "rb") as f:
-            data = pickle.load(f)
-        if alg in ["ppil","ilarl","iqlearn"]:
-            tau = 5 if alg in ["ppil","ilarl"] else 1
-            to_plot_y.append(np.array([np.mean(data[tau*i:tau*i+tau]) for i in range(int(len(data)/tau))]))
-            to_plot_x.append(np.array([tau*i for i in range(int(len(data)/tau))]))
-        else:
-            to_plot_x.append(np.cumsum(data["episodes"]))
-            to_plot_y.append(data["rewards"])
+        try:
+            with open(assets_dir(subfolder+f"/{alg}/reward_history/{seed}_{args.n_expert_trajs}.p"), "rb") as f:
+                data = pickle.load(f)
+            if alg in ["ppil","ilarl","iqlearn"]:
+                tau = 5 if alg in ["ppil","ilarl"] else 1
+                to_plot_y.append(np.array([np.mean(data[tau*i:tau*i+tau]) for i in range(int(len(data)/tau))]))
+                to_plot_x.append(np.array([tau*i for i in range(int(len(data)/tau))]))
+            else:
+                to_plot_x.append(np.cumsum(data["episodes"]))
+                to_plot_y.append(data["rewards"])
+        except:
+            print(f"Missing {alg} {seed}")
     
 
     means.append(np.mean(to_plot_y,axis=0))

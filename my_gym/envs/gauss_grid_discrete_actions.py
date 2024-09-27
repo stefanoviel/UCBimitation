@@ -236,7 +236,7 @@ class DiscreteGaussianGridWorld(TabularEnv):
                         ), \
                reward, \
                self.done, \
-               {} # TODO: changed this from none to empty dict, before it was generating an error
+               {}
 
     def reset(self, starting_index = None):
         if self.env_type == 0:
