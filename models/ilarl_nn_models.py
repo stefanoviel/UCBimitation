@@ -88,8 +88,7 @@ class ImitationLearning:
         actions = torch.eye(self.action_dim).unsqueeze(0).repeat(states.shape[0], 1, 1)  # Shape: [batch_size, action_dim, action_dim]
         state_action_pairs = torch.cat([states_expanded, actions], dim=2) 
 
-        z_values = torch.stack([z_net(state_action_pairs)  # Concatenate along the last dimension
-                                for z_net in self.z_networks])
+        z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_networks])
 
         z_avg = torch.mean(z_values, dim=0)
         z_std = torch.std(z_values, dim=0)

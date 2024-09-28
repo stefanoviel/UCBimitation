@@ -28,16 +28,11 @@ def parse_arguments():
     parser.add_argument('--num-of-NNs', type=int, default=5, metavar='N',
                         help='number of neural networks to use')
     parser.add_argument('--seed', type=int, default=1, metavar='N')
-    parser.add_argument('--eta', type=float, default=1e-3, metavar='G')
+    parser.add_argument('--eta', type=float, default=1e-1, metavar='G')
     parser.add_argument('--gamma', type=float, default=0.99, metavar='G')
 
-    
     # parser.add_argument('--beta', type=float, default=100.0, metavar='G',
     #                     help='log std for the policy (default: -0.0)')
-    # parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
-    #                     help='discount factor (default: 0.99)')
-    # parser.add_argument('--seed', type=int, default=1, metavar='N',
-    #                     help='random seed (default: 1)')
     # parser.add_argument('--n-expert-trajs', type=int, default=2, metavar='N')
 
     return parser.parse_args()
@@ -100,8 +95,8 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, max_steps
         # Update policy
         policy_loss = il_agent.update_policy(policy_states, args.eta)
         
-        if k % 10 == 0:
-            print(f"Iteration {k}: Cost Loss = {cost_loss:.4f}, Policy Loss = {policy_loss:.4f}")
+
+        print(f"Iteration {k}: Cost Loss = {cost_loss:.4f}, Policy Loss = {policy_loss:.4f}")
     
     return il_agent
 
@@ -113,7 +108,6 @@ if __name__ == "__main__":
     il_agent = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs)
     
     # You can add code here to evaluate the trained agent or save the model
-
 
 
 # python -m train_learner.ilarl_nn --env-name DiscreteGaussianGridworld-v0  --expert-trajs assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl --max-iter-num 50  --grid-type 1 --noiseE 0.0 --seed 1       
