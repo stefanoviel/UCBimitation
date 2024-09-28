@@ -47,6 +47,7 @@ class ImitationLearning:
         expert_cost = self.cost(expert_sa).mean()
         policy_cost = self.cost(policy_sa).mean()
         
+        # TODO: then we assume that the expert is optimal? becuase if we get something better than the expert it will have a lower lowwer loss
         loss = expert_cost - policy_cost
         
         self.cost_optimizer.zero_grad()
@@ -61,14 +62,14 @@ class ImitationLearning:
         
         for i, (z_net, z_opt) in enumerate(zip(self.x, self.z_optimizers)):
             z_values = z_net(sa).squeeze()
-            target = 2 * gamma * torch.roll(discounted_rewards, -1)[:-1]
+            target = gamma * torch.roll(discounted_rewards, -1)[:-1]
             loss = torch.mean((z_values[:-1] - target)**2)
             
             z_opt.zero_grad()
             loss.backward()
             z_opt.step()
     
-    
+
     def update_policy(self, states, eta):
         states = torch.FloatTensor(states)
         

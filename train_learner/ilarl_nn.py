@@ -49,30 +49,9 @@ def load_expert_trajectories(file_path):
     return data['states'], data['actions']
 
 
-def run_imitation_learning_pseudo(K, L):
-    # init pi c and zs (one z for each L) these are all neural networks
-    # z is an estimation of PV^k where V are the avlues and P is the transition matrix
-    
-    for k in range(K):
-        # sample one trajectory
-        # estimate average reward for the expert trajectories using the current 
-        # update c based on average reward of the expert C^{j+1} = \frac{1}{|\tau_pi_E|} \left[C^j - \eta \left( \sum_{s,a \sim \tau_pi_E} C_j(s,a) - \sum_{s,a \sim \tau_pi_j} C_j(s,a) \right)\right]
-        # TODO: then we assume that the expert is optimal? becuase if we get something better than the expert it will have a lower lowwer loss
-
-        for l in range(L):
-            # sample one trajectory at most length N from the current policy 
-            # update zi based on the discounted reward of the trajectory: \beta_Z^{k+1} = \theta_Z^k \ell - \eta \left( \nabla \sum_{i=1}^N z_\ell^k(s_i, q_i) - 2 \gamma \sum_{j=1+1}^N \gamma^{j-i-1} C(s_j^\ell, a_j^\ell) \right)
-            
-            pass
-
-        # estimate z as the average of the zs
-        # estimate b as std of the zs
-        # Q = c + z - b
-
-        # update pi based on Q \sum_{s \in \mathcal{D}} \left\langle \Pi_{\theta}(\cdot | s), \eta \left( Q^t(s, \cdot) + \log \frac{\Pi_{\theta}(\cdot | s)}{\Pi(\cdot | s)} \right) \right\rangle
-
 
 def collect_trajectory(env, agent, max_steps=10000):
+    # TODO: does the number of steps should be geometric? 
     states, actions, rewards = [], [], []
     state = env.reset()
     for _ in range(max_steps):
