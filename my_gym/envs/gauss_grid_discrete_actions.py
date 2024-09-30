@@ -168,9 +168,7 @@ class DiscreteGaussianGridWorld(TabularEnv):
 
         TabularEnv.__init__(self, prop)
         self.env_type = env_type
-        # env_type 0: Random start within grid, terminal area in lower-left quadrant, reward focuses on reaching terminal area and minimizing distance from origin, large reward when terminal area is reached.
-        # env_type 1: Fixed start at (-1, 1), terminal area in upper-right quadrant, reward focuses on minimizing distance from (1, -1), additional reward for reaching terminal area.
-        
+
         self.state=None
         self.prop=prop
         self.env_type=env_type
@@ -178,15 +176,14 @@ class DiscreteGaussianGridWorld(TabularEnv):
         self.reset()
         self.steps_from_last_reset=0
         if env_type == 0:
+            # env_type 0: Random start within grid, terminal area in lower-left quadrant, reward focuses on reaching terminal area and minimizing distance from origin, large reward when terminal area is reached.
             self.terminal_area = np.array([[-1.0, -0.95], [0.95, 1.0]])
         else:
+            # env_type 1: Fixed start at (-1, 1), terminal area in upper-right quadrant, reward focuses on minimizing distance from (1, -1), additional reward for reaching terminal area.
             self.terminal_area = np.array([[0.95, 1.0],[-1.0, -0.95]])
 
-    def step(self, a):
-        #print(a, "action")
-        reward = self.compute_reward()
-        if self.done:
-            return np.array([self.state[0],
+    def get_observation(self):
+        return np.array([self.state[0],
                         self.state[1],
                         self.state[0]*self.state[1],
                         self.state[0]**2,
@@ -196,11 +193,12 @@ class DiscreteGaussianGridWorld(TabularEnv):
                         #self.state[1] ** 3,
                         8*np.exp(-8*self.state[0]**2-8*self.state[1]**2),
                         float(self.done)
-                        ]
-                        ), \
-               reward, \
-               self.done, \
-               {}
+                        ])
+    def step(self, a):
+        #print(a, "action")
+        reward = self.compute_reward()
+        if self.done:
+            return self.get_observation(), reward, self.done, {}
         
         self.state += self._action_to_direction[a] + self.prop*np.random.uniform(-0.1, 0.1, size=2)
         self.state[0] = np.max([np.min([1,self.state[0]]),-1])
@@ -210,36 +208,7 @@ class DiscreteGaussianGridWorld(TabularEnv):
             self.done = True
         
         self.steps_from_last_reset += 1
-        """ if self.steps_from_last_reset == 5000:
-            self.done = True
-            return np.array([self.state[0],
-                             self.state[1],
-                             # self.state[0]*self.state[1],
-                             self.state[0] ** 2,
-                             self.state[1] ** 2,
-                             # self.state[0] ** 3,
-                             # self.state[1] ** 3,
-                             8*np.exp(-8*self.state[0]**2-8*self.state[1]**2),
-                             0.0]
-                            ), \
-                   reward, \
-                   self.done, \
-                   None """
-        return np.array([self.state[0],
-                        self.state[1],
-                        self.state[0]*self.state[1],
-                        self.state[0]**2,
-                        self.state[1]**2,
-                        1,
-                        #self.state[0] ** 3,
-                        #self.state[1] ** 3,
-                        8*np.exp(-8*self.state[0]**2-8*self.state[1]**2),
-                        float(self.done)
-                        ]
-                        ), \
-               reward, \
-               self.done, \
-               {}
+        return self.get_observation(), reward, self.done, {}
 
     def reset(self, starting_index = None):
         if self.env_type == 0:
@@ -248,19 +217,48 @@ class DiscreteGaussianGridWorld(TabularEnv):
             self.state = np.array([-1.0, 1.0])
         self.steps_from_last_reset = 0
         self.done = False
-        return np.array([self.state[0],
-                        self.state[1],
-                        self.state[0]*self.state[1],
-                        self.state[0]**2,
-                        self.state[1]**2,
-                        1,
-                        #self.state[0] ** 3,
-                        #self.state[1] ** 3,
-                        8*np.exp(-8*self.state[0]**2-8*self.state[1]**2),
-                        float(self.done)
-                        ]
-                        )
+        return self.get_observation()
+    
+
+    # TODO: compute cost and update everything else
     def compute_reward(self):
+        """
+        Computes the reward based on the agent's position (self.state) in the environment.
+        The reward function varies depending on the environment type (env_type) and whether
+        the agent is within a specified terminal area (self.terminal_area).
+
+        env_type 0:
+        -----------
+        - The environment rewards the agent based on its position (x, y).
+        - If the agent is within the terminal area (a rectangular region defined by 
+        self.terminal_area), a bonus of +2000 is added.
+        - The reward is calculated as:
+            reward = -(x^2 + y^2) + 3x - 5 + 2000 (if inside the terminal area)
+            reward = -(x^2 + y^2) + 3x - 5 (if outside the terminal area)
+        Where:
+        - (x, y) is the agent's current position (self.state[0], self.state[1]).
+        - The term -(x^2 + y^2) penalizes the agent for being far from the origin (0, 0).
+        - The term +3x provides a linear incentive based on the x-coordinate.
+        - The constant -5 is a fixed offset.
+        - The bonus +2000 is awarded if the agent reaches the terminal area.
+
+        env_type 1:
+        -----------
+        - The reward function is more complex and involves two components:
+        1. A penalty based on the distance from the point (1, -1), calculated as:
+            -(x - 1)^2 - (y + 1)^2
+        2. A Gaussian-shaped negative penalty centered at the origin (0, 0), given by:
+            -80 * exp(-8 * x^2 - 8 * y^2), which penalizes the agent for moving away from the origin.
+        - If the agent is within the terminal area, a bonus of +100 is added.
+        - The reward is calculated as:
+            reward = -(x - 1)^2 - (y + 1)^2 - 80 * exp(-8 * x^2 - 8 * y^2)
+            If inside the terminal area, an additional +100 is awarded.
+        
+        Returns:
+        --------
+        - The computed reward for the agent's current state in the environment.
+        """
+
         if self.env_type==0:
             if (self.terminal_area[0,0] <= self.state[0]  <= self.terminal_area[0,1] and
             self.terminal_area[1,0] <= self.state[1]  <= self.terminal_area[1,1]):

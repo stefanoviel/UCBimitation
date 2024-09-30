@@ -28,7 +28,7 @@ def parse_arguments():
     parser.add_argument('--num-of-NNs', type=int, default=5, metavar='N',
                         help='number of neural networks to use')
     parser.add_argument('--seed', type=int, default=1, metavar='N')
-    parser.add_argument('--eta', type=float, default=1e-1, metavar='G')
+    parser.add_argument('--eta', type=float, default=1e-3, metavar='G')
     parser.add_argument('--gamma', type=float, default=0.99, metavar='G')
 
     # parser.add_argument('--beta', type=float, default=100.0, metavar='G',
@@ -47,12 +47,10 @@ def load_expert_trajectories(file_path):
         data = pickle.load(file)
     return data['states'], data['actions']
 
-
 def collect_trajectory(env, agent, max_steps=10000):
-    # TODO: does the number of steps should be geometric? 
     states, actions, rewards = [], [], []
     state = env.reset()
-    for _ in range(max_steps):
+    for iterations in range(max_steps):
         action = agent.select_action(state)
         next_state, reward, done, _ = env.step(action)
         
@@ -61,27 +59,33 @@ def collect_trajectory(env, agent, max_steps=10000):
         rewards.append(reward)
         
         if done:
+            print("Done")
             break
+
         state = next_state
     
     return states, actions, rewards
 
+def plot_visited_states(states):    
+    # TODO: add always plot of the expert
+    # TODO: other plots
+    states = np.array(states)
+    plt.scatter(states[:, 0], states[:, 1])
+    plt.show()
 
-def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, max_steps=10000):
+def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs,seed=None, max_steps=10000):
     expert_states, expert_actions = load_expert_trajectories(expert_file)
     
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
     
-    il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs)
+    il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, seed=seed)
     
-    for k in range(max_iter_num):
-        # Sample expert trajectory
-        expert_traj_idx = np.random.randint(len(expert_states))
-        expert_traj_states = expert_states[expert_traj_idx]
-        expert_traj_actions = expert_actions[expert_traj_idx]
-        
+    for k in range(max_iter_num):        
         # Sample policy trajectory
+        expert_traj_states = expert_states[-1]  # only keeping second which is the best trajectory
+        expert_traj_actions = expert_actions[-1]
+
         policy_states, policy_actions, policy_rewards = collect_trajectory(env, il_agent, max_steps)
         
         # Update cost function
@@ -89,14 +93,17 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, max_steps
         
         # Update z networks
         for z_index in range(num_of_NNs):
-            z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, max_steps)
+            z_states, z_actions, _ = collect_trajectory(env, il_agent, max_steps) # pased on current policy
+            z_reward = None # cost network valutata a z_states, z_actions
             il_agent.update_z_at_index(z_states, z_actions, z_rewards, args.gamma, args.eta, z_index)
         
         # Update policy
         policy_loss = il_agent.update_policy(policy_states, args.eta)
         
+        print(f"Iteration {k}: Cost Loss = {cost_loss:.4f}, Policy Loss = {policy_loss:.4f}, average cost = {np.mean(policy_rewards)}")
 
-        print(f"Iteration {k}: Cost Loss = {cost_loss:.4f}, Policy Loss = {policy_loss:.4f}")
+        if k % 10 == 0:
+            plot_visited_states(policy_states)
     
     return il_agent
 
@@ -105,9 +112,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     env = create_environment(args)
     
-    il_agent = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs)
+    il_agent = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, args.seed)
     
-    # You can add code here to evaluate the trained agent or save the model
-
 
 # python -m train_learner.ilarl_nn --env-name DiscreteGaussianGridworld-v0  --expert-trajs assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl --max-iter-num 50  --grid-type 1 --noiseE 0.0 --seed 1       

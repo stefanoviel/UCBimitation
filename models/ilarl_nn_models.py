@@ -18,10 +18,15 @@ class TwoLayerNet(nn.Module):
         return x
 
 class ImitationLearning:
-    def __init__(self, state_dim, action_dim, num_of_NNs, learning_rate=1e-3):
+    def __init__(self, state_dim, action_dim, num_of_NNs, learning_rate=1e-3, seed=None):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_of_NNs = num_of_NNs
+
+         # Set random seed for reproducibility
+        if seed is not None:
+            np.random.seed(seed)
+            torch.manual_seed(seed)
         
         # Initialize neural networks
         self.policy = TwoLayerNet(state_dim, action_dim)
@@ -53,8 +58,9 @@ class ImitationLearning:
         policy_cost = self.cost(policy_sa).mean()
         
         # TODO: then we assume that the expert is optimal? becuase if we get something better than the expert it will have a lower lowwer loss
+
+        # TOD0: policy_cost - expert_cost (if we use reward)
         loss = expert_cost - policy_cost
-        
         self.cost_optimizer.zero_grad()
         loss.backward()
         self.cost_optimizer.step()
@@ -62,18 +68,25 @@ class ImitationLearning:
         return loss.item()
     
     def update_z_at_index(self, states, actions, rewards, gamma, eta, z_index):
-
         actions_one_hot = torch.nn.functional.one_hot(torch.tensor(actions), num_classes=self.action_dim)
         sa = torch.vstack([torch.cat((torch.tensor(a1), a2.float())) for a1, a2 in zip(states, actions_one_hot)])
 
-        discounted_rewards = torch.FloatTensor([gamma**i * r for i, r in enumerate(rewards)])
-        
         z_net = self.z_networks[z_index]
         z_opt = self.z_optimizers[z_index]
         
         z_values = z_net(sa).squeeze()
-        target = gamma * torch.roll(discounted_rewards, -1)[:-1]
-        loss = torch.mean((z_values[:-1] - target)**2)
+        
+        # Calculate discounted future rewards for each state
+        discounted_future_rewards = []
+        for i in range(len(rewards)):
+            future_rewards = rewards[i:]
+            discounted = [gamma**j * r for j, r in enumerate(future_rewards)]
+            discounted_future_rewards.append(sum(discounted))
+        
+        discounted_future_rewards = torch.FloatTensor(discounted_future_rewards)
+        
+        # Compute loss
+        loss = torch.mean((z_values - discounted_future_rewards)**2)
         
         z_opt.zero_grad()
         loss.backward()
@@ -88,7 +101,7 @@ class ImitationLearning:
         actions = torch.eye(self.action_dim).unsqueeze(0).repeat(states.shape[0], 1, 1)  # Shape: [batch_size, action_dim, action_dim]
         state_action_pairs = torch.cat([states_expanded, actions], dim=2) 
 
-        z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_networks])
+        z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_networks]) # TODO: check
 
         z_avg = torch.mean(z_values, dim=0)
         z_std = torch.std(z_values, dim=0)
@@ -105,7 +118,8 @@ class ImitationLearning:
         old_probs = current_probs.detach()
 
         # Compute the loss
-        loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
+        # TODO: - if using reward
+        loss = torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
 
         # Update the policy
         self.policy_optimizer.zero_grad()
