@@ -117,7 +117,7 @@ class ImitationLearning:
         old_probs = current_probs.detach()
 
         # Compute the loss
-        # we add "-" because we want to maximize the reward and thus q
+        # we add "-" because we want to maximize the reward and thus q => minimize the loss with a minus in front
         loss = - torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
 
         # Update the policy

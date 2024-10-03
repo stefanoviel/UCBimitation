@@ -87,6 +87,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs,seed=None,
         expert_traj_actions = expert_actions[-1]
 
         policy_states, policy_actions, policy_rewards = collect_trajectory(env, il_agent, max_steps)
+        print(f"Iteration {k}: Cost Loss = {cost_loss:.4f}, Policy Loss = {policy_loss:.4f}, average reward = {np.mean(policy_rewards)}")
         
         # Update cost function
         cost_loss = il_agent.update_cost(expert_traj_states, expert_traj_actions, policy_states, policy_actions, args.eta)
@@ -104,8 +105,6 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs,seed=None,
         # Update policy
         policy_loss = il_agent.update_policy(policy_states, args.eta)
         
-        print(f"Iteration {k}: Cost Loss = {cost_loss:.4f}, Policy Loss = {policy_loss:.4f}, average cost = {np.mean(policy_rewards)}")
-
         if k % 10 == 0:
             plot_visited_states(policy_states)
     
