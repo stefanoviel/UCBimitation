@@ -93,8 +93,12 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs,seed=None,
         
         # Update z networks
         for z_index in range(num_of_NNs):
-            z_states, z_actions, _ = collect_trajectory(env, il_agent, max_steps) # pased on current policy
-            z_reward = None # cost network valutata a z_states, z_actions
+            z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, max_steps) # pased on current policy
+
+            # state_action = il_agent.encode_actions_concatenate_states(z_states, z_actions)
+            # z_rewards = il_agent.reward(state_action).squeeze().detach().numpy()
+
+            # TODO: you can't use real rewards!!!
             il_agent.update_z_at_index(z_states, z_actions, z_rewards, args.gamma, args.eta, z_index)
         
         # Update policy

@@ -30,12 +30,12 @@ class ImitationLearning:
         
         # Initialize neural networks
         self.policy = TwoLayerNet(state_dim, action_dim)
-        self.cost = TwoLayerNet(state_dim + action_dim, 1)
+        self.reward = TwoLayerNet(state_dim + action_dim, 1)
         self.z_networks = [TwoLayerNet(state_dim + action_dim, 1) for _ in range(num_of_NNs)]
         
         # Initialize optimizers
         self.policy_optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
-        self.cost_optimizer = optim.Adam(self.cost.parameters(), lr=learning_rate)
+        self.reward_optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate)
         self.z_optimizers = [optim.Adam(net.parameters(), lr=learning_rate) for net in self.z_networks]
         
     def select_action(self, state):
@@ -46,30 +46,28 @@ class ImitationLearning:
         return action
 
     def update_cost(self, expert_states, expert_actions, policy_states, policy_actions, eta):
-        # One-hot encode the actions
-        expert_actions_one_hot = torch.nn.functional.one_hot(torch.tensor(expert_actions), num_classes=self.action_dim)
-        policy_actions_one_hot = torch.nn.functional.one_hot(torch.tensor(policy_actions), num_classes=self.action_dim)
+        expert_sa = self.encode_actions_concatenate_states(expert_states, expert_actions)
+        policy_sa = self.encode_actions_concatenate_states(policy_states, policy_actions)
         
-        # Concatenate states and one-hot encoded actions
-        expert_sa = torch.vstack([torch.cat((torch.tensor(a1), a2.float())) for a1, a2 in zip(expert_states, expert_actions_one_hot)])
-        policy_sa = torch.vstack([torch.cat((torch.tensor(a1), a2.float())) for a1, a2 in zip(policy_states, policy_actions_one_hot)])
+        expert_reward = self.reward(expert_sa).mean()
+        policy_reward = self.reward(policy_sa).mean()
         
-        expert_cost = self.cost(expert_sa).mean()
-        policy_cost = self.cost(policy_sa).mean()
+        # TODO: check if this is correct
+        # we want to increase the expert reward, because we know the expert played well
+        # we want to bring the policy reward closer to the expert reward
+        # what stops me from increasing the expert reward and decresing the policy reward indefinitely? 
+            # the fact that the policy is trained to maximize the reward. So if the reward is high for the expert, the policy will try to get the same reward
+            # the policy reward is here just for reference
+        loss = policy_reward - expert_reward # if we use reward. cost: expert_cost - policy_cost
         
-        # TODO: then we assume that the expert is optimal? becuase if we get something better than the expert it will have a lower lowwer loss
-
-        # TOD0: policy_cost - expert_cost (if we use reward)
-        loss = expert_cost - policy_cost
-        self.cost_optimizer.zero_grad()
+        self.reward_optimizer.zero_grad()
         loss.backward()
-        self.cost_optimizer.step()
+        self.reward_optimizer.step()
         
         return loss.item()
     
     def update_z_at_index(self, states, actions, rewards, gamma, eta, z_index):
-        actions_one_hot = torch.nn.functional.one_hot(torch.tensor(actions), num_classes=self.action_dim)
-        sa = torch.vstack([torch.cat((torch.tensor(a1), a2.float())) for a1, a2 in zip(states, actions_one_hot)])
+        sa = self.encode_actions_concatenate_states(states, actions)
 
         z_net = self.z_networks[z_index]
         z_opt = self.z_optimizers[z_index]
@@ -106,9 +104,10 @@ class ImitationLearning:
         z_avg = torch.mean(z_values, dim=0)
         z_std = torch.std(z_values, dim=0)
 
-        c_values = self.cost(state_action_pairs)
+        rewards = self.reward(state_action_pairs)
         
-        Q = c_values + z_avg - z_std  # Shape: [batch_size, action_dim]
+        # with the reward we want q to be an overestimation of the reward
+        Q = rewards + z_avg + z_std  # Shape: [batch_size, action_dim]
 
         # Compute current policy probabilities
         logits = self.policy(states)
@@ -118,8 +117,8 @@ class ImitationLearning:
         old_probs = current_probs.detach()
 
         # Compute the loss
-        # TODO: - if using reward
-        loss = torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
+        # we add "-" because we want to maximize the reward and thus q
+        loss = - torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
 
         # Update the policy
         self.policy_optimizer.zero_grad()
@@ -127,3 +126,7 @@ class ImitationLearning:
         self.policy_optimizer.step()
 
         return loss.item()
+    
+    def encode_actions_concatenate_states(self, states, actions):
+        actions_one_hot = torch.nn.functional.one_hot(torch.tensor(actions), num_classes=self.action_dim)
+        return torch.vstack([torch.cat((torch.tensor(a1), a2.float())) for a1, a2 in zip(states, actions_one_hot)])
