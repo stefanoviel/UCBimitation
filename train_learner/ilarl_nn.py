@@ -72,7 +72,9 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
     
     il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, device=device, seed=seed)
     
-    for k in range(max_iter_num):        
+    for k in range(max_iter_num):
+        start_time = time.time()
+        
         expert_traj_states = expert_states[-1]
         expert_traj_actions = expert_actions[-1]
 
@@ -81,7 +83,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         cost_loss = il_agent.update_cost(expert_traj_states, expert_traj_actions, policy_states, policy_actions, args.eta)
         
         for z_index in range(num_of_NNs):
-            z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, device, max_steps) # pased on current policy
+            z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, device, max_steps) # based on current policy
 
             # state_action = il_agent.encode_actions_concatenate_states(z_states, z_actions)
             # z_rewards = il_agent.reward(state_action).squeeze().detach().numpy()
@@ -91,7 +93,10 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         
         policy_loss = il_agent.update_policy(policy_states, args.eta)
         
-        print(f"Iteration {k}: Cost Loss = {cost_loss:.4f}, Policy Loss = {policy_loss:.4f}, average cost = {np.mean(policy_rewards)}")
+        end_time = time.time()
+        loop_duration = end_time - start_time
+        
+        print(f"Iteration {k}: Cost Loss = {cost_loss:.4f}, Policy Loss = {policy_loss:.4f}, average cost = {np.mean(policy_rewards)}, Loop Duration = {loop_duration:.4f} seconds")
 
         if k % 10 == 0:
             plot_visited_states(policy_states)
