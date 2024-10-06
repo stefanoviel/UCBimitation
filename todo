@@ -4,4 +4,3 @@ plot with different number of NNs and see how performance change
 keep update in memory (different dataset between different NN) to increase stability. Make it optional (on policy - off policy). does it improve? 
 
 codice per le routine di estimation of the different parts
-

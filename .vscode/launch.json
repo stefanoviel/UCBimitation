@@ -1,17 +1,28 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python Debugger: Run plotting.plot",
-            "type": "python",
-            "request": "launch",
-            "module": "plotting.plot",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/imit_ucb",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}:imit_ucb:${env:PYTHONPATH}"
-            },
-            "args": ["--noiseE", "0.0"]
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run train_learner.ilarl_nn",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "train_learner.ilarl_nn",
+      "args": [
+        "--env-name", "DiscreteGaussianGridworld-v0",
+        "--expert-trajs", "assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl",
+        "--max-iter-num", "100",
+        "--grid-type", "1",
+        "--noiseE", "0.0",
+        "--seed", "1"
+      ],
+      "console": "integratedTerminal",
+      "python": "/home/viel/.pyenv/shims/python",
+      "env": {
+        "PYENV_VERSION": ".myenv"
+      },
+      "cwd": "${workspaceFolder}",
+      "shell": {
+        "executable": "/bin/bash"
+      }
+    }
+  ]
 }
