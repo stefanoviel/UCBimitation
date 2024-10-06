@@ -41,7 +41,7 @@ def load_expert_trajectories(file_path):
 
 def collect_trajectory(env, agent, device, max_steps=10000):
     states, actions, rewards = [], [], []
-    state = env.reset()
+    state, _ = env.reset()
     for iterations in range(max_steps):
         state_tensor = torch.FloatTensor(state).to(device)
         action = agent.select_action(state_tensor)
@@ -81,7 +81,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         cost_loss = il_agent.update_cost(expert_traj_states, expert_traj_actions, policy_states, policy_actions, args.eta)
         
         for z_index in range(num_of_NNs):
-            z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, max_steps) # pased on current policy
+            z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, device, max_steps) # pased on current policy
 
             # state_action = il_agent.encode_actions_concatenate_states(z_states, z_actions)
             # z_rewards = il_agent.reward(state_action).squeeze().detach().numpy()
@@ -102,7 +102,14 @@ if __name__ == "__main__":
     args = parse_arguments()
     env = create_environment(args)
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Check if CUDA is available and choose a specific GPU
+    if torch.cuda.is_available():
+        # Get the first available GPU (you can also change to "cuda:1", etc. based on your requirements)
+        device = torch.device("cuda:3")  # explicitly select GPU 0
+    else:
+        device = torch.device("cpu")  # fallback to CPU
+
     print(f"Using device: {device}")
-    
+
+    # Your imitation learning agent call
     il_agent = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed)

@@ -162,25 +162,37 @@ class DiscreteContinuousGridWorld(TabularEnv):
 
 
 # use this one
-class DiscreteGaussianGridWorld(TabularEnv):
+class DiscreteGaussianGridWorld(gym.Env):
     def __init__(self, env_type=0, prop=0):
-        # Characteristics of the gridworld
+        super().__init__()
 
-        TabularEnv.__init__(self, prop)
         self.env_type = env_type
+        self.prop = prop
+        self.state = None
+        self.steps_from_last_reset = 0
 
-        self.state=None
-        self.prop=prop
-        self.env_type=env_type
-        self.seed()
-        self.reset()
-        self.steps_from_last_reset=0
+        # Define action and observation spaces
+        self.action_space = spaces.Discrete(4)  # 4 discrete actions
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(8,), dtype=np.float32)
+
+        # Define action to direction mapping
+        self._action_to_direction = {
+            0: np.array([0, 1]),   # Up
+            1: np.array([1, 0]),   # Right
+            2: np.array([0, -1]),  # Down
+            3: np.array([-1, 0])   # Left
+        }
+
         if env_type == 0:
-            # env_type 0: Random start within grid, terminal area in lower-left quadrant, reward focuses on reaching terminal area and minimizing distance from origin, large reward when terminal area is reached.
             self.terminal_area = np.array([[-1.0, -0.95], [0.95, 1.0]])
         else:
-            # env_type 1: Fixed start at (-1, 1), terminal area in upper-right quadrant, reward focuses on minimizing distance from (1, -1), additional reward for reaching terminal area.
-            self.terminal_area = np.array([[0.95, 1.0],[-1.0, -0.95]])
+            self.terminal_area = np.array([[0.95, 1.0], [-1.0, -0.95]])
+
+
+    def seed(self, seed=None):
+        """Set the seed for this env's random number generator(s)."""
+        self.np_random, seed = gym.utils.seeding.np_random(seed)
+        return [seed]
 
     def get_observation(self):
         return np.array([self.state[0],
@@ -210,14 +222,18 @@ class DiscreteGaussianGridWorld(TabularEnv):
         self.steps_from_last_reset += 1
         return self.get_observation(), reward, self.done, {}
 
-    def reset(self, starting_index = None):
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+
         if self.env_type == 0:
-            self.state = np.random.uniform(-1, 1, size=2)
+            self.state = self.np_random.uniform(-1, 1, size=2)
         else:
             self.state = np.array([-1.0, 1.0])
+
         self.steps_from_last_reset = 0
         self.done = False
-        return self.get_observation()
+
+        return self.get_observation(), {}
     
 
     # TODO: compute cost and update everything else

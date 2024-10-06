@@ -1,5 +1,11 @@
 # UCBimitation
 
+## instructions
+
+inside folder my_gym run: 
+`pip install -e .`
+
+
 Authors' implementation for the experiment in the ICML 2024 paper: **Imitation Learning in Discounted Linear MDPs without exploration assumptions**
 
 Link: https://arxiv.org/abs/2405.02181
