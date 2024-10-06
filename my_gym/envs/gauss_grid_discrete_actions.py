@@ -164,24 +164,18 @@ class DiscreteContinuousGridWorld(TabularEnv):
 # use this one
 class DiscreteGaussianGridWorld(gym.Env):
     def __init__(self, env_type=0, prop=0):
-        super().__init__()
 
+        TabularEnv.__init__(self, prop)
         self.env_type = env_type
-        self.prop = prop
-        self.state = None
-        self.steps_from_last_reset = 0
+        self.state=None
+        self.prop=prop
+        self.env_type=env_type
+        self.seed()
+        self.reset()
 
         # Define action and observation spaces
         self.action_space = spaces.Discrete(4)  # 4 discrete actions
         self.observation_space = spaces.Box(low=-1, high=1, shape=(8,), dtype=np.float32)
-
-        # Define action to direction mapping
-        self._action_to_direction = {
-            0: np.array([0, 1]),   # Up
-            1: np.array([1, 0]),   # Right
-            2: np.array([0, -1]),  # Down
-            3: np.array([-1, 0])   # Left
-        }
 
         if env_type == 0:
             self.terminal_area = np.array([[-1.0, -0.95], [0.95, 1.0]])
