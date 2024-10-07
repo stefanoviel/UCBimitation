@@ -26,7 +26,7 @@ def parse_arguments():
     parser.add_argument('--num-of-NNs', type=int, default=5, metavar='N',
                         help='number of neural networks to use')
     parser.add_argument('--seed', type=int, default=1, metavar='N')
-    parser.add_argument('--eta', type=float, default=1e-3, metavar='G')
+    parser.add_argument('--eta', type=float, default=1, metavar='G')
     parser.add_argument('--gamma', type=float, default=0.99, metavar='G')
     return parser.parse_args()
 
@@ -93,14 +93,15 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
             # TODO: you can't use real rewards here, because you don't know them
             il_agent.update_z_at_index(z_states, z_actions, z_rewards, args.gamma, args.eta, z_index)
         
+
         policy_loss = il_agent.update_policy(policy_states, args.eta)
         
         end_time = time.time()
         loop_duration = end_time - start_time
         
-        print(f"Iteration {k}: Reward Loss = {reward_loss:.4f}, Policy Loss = {policy_loss:.4f}, average reward = {policy_rewards.mean().item()}, Loop Duration = {loop_duration:.4f} seconds")
+        print(f"Iteration {k}: Reward Loss = {reward_loss:.4f}, Policy Loss = {policy_loss}, average reward = {policy_rewards.mean().item()}, Loop Duration = {loop_duration:.4f} seconds")
 
-        if k % 10 == 0:
+        if k % 5 == 0 and k > 0:
             plot_visited_states(policy_states)
     
     return il_agent

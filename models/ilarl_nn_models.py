@@ -17,7 +17,7 @@ class TwoLayerNet(torch.nn.Module):
 
 
 class ImitationLearning:
-    def __init__(self, state_dim, action_dim, num_of_NNs, learning_rate=1e-3, device='cpu', seed=None):
+    def __init__(self, state_dim, action_dim, num_of_NNs, learning_rate=1e-2, device='cpu', seed=None):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_of_NNs = num_of_NNs
@@ -54,8 +54,8 @@ class ImitationLearning:
         expert_sa = torch.cat((expert_states, expert_actions_one_hot), dim=1)
         policy_sa = torch.cat((policy_states, policy_actions_one_hot), dim=1)
         
-        expert_cost = self.reward(expert_sa).mean()
-        policy_cost = self.reward(policy_sa).mean()
+        expert_reward = self.reward(expert_sa).mean()
+        policy_reward = self.reward(policy_sa).mean()
 
         # TODO: check if this is correct
         # we want to increase the expert reward, because we know the expert played well
@@ -63,7 +63,8 @@ class ImitationLearning:
         # what stops me from increasing the expert reward and decresing the policy reward indefinitely? 
             # the fact that the policy is trained to maximize the reward. So if the reward is high for the expert, the policy will try to get the same reward
             # the policy reward is here just for reference
-        loss = expert_cost - policy_cost
+
+        loss = policy_reward - expert_reward
         self.reward_optimizer.zero_grad()
         loss.backward()
         self.reward_optimizer.step()
@@ -101,16 +102,17 @@ class ImitationLearning:
         z_avg = torch.mean(z_values, dim=0)
         z_std = torch.std(z_values, dim=0)
 
-        c_values = self.reward(state_action_pairs)
+        rewards = self.reward(state_action_pairs)
         
-        Q = c_values + z_avg + z_std
+        Q = rewards + z_avg + z_std
 
         logits = self.policy(states)
         current_probs = torch.softmax(logits, dim=-1)
         
         old_probs = current_probs.detach()
 
-        loss = - torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
+        # TODO: why without the - the loss gets minimized otherwise it gets maximized
+        loss = torch.mean(torch.sum(current_probs * (-eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
 
         self.policy_optimizer.zero_grad()
         loss.backward()

@@ -273,16 +273,16 @@ class DiscreteGaussianGridWorld(gym.Env):
         if self.env_type==0:
             if (self.terminal_area[0,0] <= self.state[0]  <= self.terminal_area[0,1] and
             self.terminal_area[1,0] <= self.state[1]  <= self.terminal_area[1,1]):
-                cost = -(self.state[0] ** 2 + self.state[1] ** 2) + 3 * \
+                reward = -(self.state[0] ** 2 + self.state[1] ** 2) + 3 * \
                      self.state[0] - 5 + 2000
             else:
-                cost = -(self.state[0] ** 2 + self.state[1] ** 2) + 3 * \
+                reward = -(self.state[0] ** 2 + self.state[1] ** 2) + 3 * \
                      self.state[0] - 5
         elif self.env_type==1:
-            cost = -(self.state[0] -1)**2 - (self.state[1] + 1)**2 - 80*np.exp(-8*self.state[0]**2-8*self.state[1]**2)
+            reward = -(self.state[0] -1)**2 - (self.state[1] + 1)**2 - 80*np.exp(-8*self.state[0]**2-8*self.state[1]**2)
             if (self.terminal_area[0, 0] <= self.state[0] <= self.terminal_area[
                 0, 1] and
                     self.terminal_area[1, 0] <= self.state[1] <=
                     self.terminal_area[1, 1]):
-                cost += 100
-        return - cost # we add the minus because we are using reward and not cost
+                reward += 100
+        return reward # we add the minus because we are using reward and not cost
