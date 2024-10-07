@@ -48,7 +48,7 @@ def collect_trajectory(env, agent, device, max_steps=10000):
         action = agent.select_action(state_tensor)
         next_state, reward, done, _ = env.step(action.item())
         
-        states.append(state_tensor.cpu().numpy())
+        states.append(state_tensor.cpu().numpy())  # TODO: they go on cpu and then come back to gpu
         actions.append(action.item())
         rewards.append(reward)
         
@@ -78,15 +78,17 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
     for k in range(max_iter_num):
         start_time = time.time()
         
+        # TODO: consider more than one expert trajectory
         expert_traj_states = expert_states[-1]
         expert_traj_actions = expert_actions[-1]
         
         policy_states, policy_actions, policy_rewards = collect_trajectory(env, il_agent, device, max_steps)
         
-        cost_loss = il_agent.update_cost(expert_traj_states, expert_traj_actions, policy_states, policy_actions, args.eta)
+        reward_loss = il_agent.update_reward(expert_traj_states, expert_traj_actions, policy_states, policy_actions, args.eta)
         
         for z_index in range(num_of_NNs):
             z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, device, max_steps)
+            # TODO: you can't use real rewards here, because you don't know them
             il_agent.update_z_at_index(z_states, z_actions, z_rewards, args.gamma, args.eta, z_index)
         
         policy_loss = il_agent.update_policy(policy_states, args.eta)
@@ -94,7 +96,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         end_time = time.time()
         loop_duration = end_time - start_time
         
-        print(f"Iteration {k}: Cost Loss = {cost_loss:.4f}, Policy Loss = {policy_loss:.4f}, average cost = {policy_rewards.mean().item()}, Loop Duration = {loop_duration:.4f} seconds")
+        print(f"Iteration {k}: Cost Loss = {reward_loss:.4f}, Policy Loss = {policy_loss:.4f}, average reward = {policy_rewards.mean().item()}, Loop Duration = {loop_duration:.4f} seconds")
 
         if k % 10 == 0:
             plot_visited_states(policy_states)
