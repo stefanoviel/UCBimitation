@@ -1,4 +1,8 @@
-cluster 
+read other similar paper, just to get an idea
+maybe the problem is in the estimation of the reward, should I increase the number of trajectories of the expert? 
+    find a way to check how good the estimation of the reward is
+why if I put a minus in front the policy loss goes up??
+
 does it work with reward network?
 plot with different number of NNs and see how performance change
 keep update in memory (different dataset between different NN) to increase stability. Make it optional (on policy - off policy). does it improve? 
