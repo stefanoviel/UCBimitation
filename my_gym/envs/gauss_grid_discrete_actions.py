@@ -206,6 +206,7 @@ class DiscreteGaussianGridWorld(gym.Env):
         if self.done:
             return self.get_observation(), reward, self.done, {}
         
+        # TODO: removed random actionss
         self.state += self._action_to_direction[a] + self.prop*np.random.uniform(-0.1, 0.1, size=2)
         self.state[0] = np.max([np.min([1,self.state[0]]),-1])
         self.state[1] = np.max([np.min([1, self.state[1]]), -1])
@@ -272,16 +273,16 @@ class DiscreteGaussianGridWorld(gym.Env):
         if self.env_type==0:
             if (self.terminal_area[0,0] <= self.state[0]  <= self.terminal_area[0,1] and
             self.terminal_area[1,0] <= self.state[1]  <= self.terminal_area[1,1]):
-                reward = -(self.state[0] ** 2 + self.state[1] ** 2) + 3 * \
+                cost = -(self.state[0] ** 2 + self.state[1] ** 2) + 3 * \
                      self.state[0] - 5 + 2000
             else:
-                reward = -(self.state[0] ** 2 + self.state[1] ** 2) + 3 * \
+                cost = -(self.state[0] ** 2 + self.state[1] ** 2) + 3 * \
                      self.state[0] - 5
         elif self.env_type==1:
-            reward = -(self.state[0] -1)**2 - (self.state[1] + 1)**2 - 80*np.exp(-8*self.state[0]**2-8*self.state[1]**2)
+            cost = -(self.state[0] -1)**2 - (self.state[1] + 1)**2 - 80*np.exp(-8*self.state[0]**2-8*self.state[1]**2)
             if (self.terminal_area[0, 0] <= self.state[0] <= self.terminal_area[
                 0, 1] and
                     self.terminal_area[1, 0] <= self.state[1] <=
                     self.terminal_area[1, 1]):
-                reward += 100
-        return reward
+                cost += 100
+        return - cost # we add the minus because we are using reward and not cost

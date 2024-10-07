@@ -63,6 +63,8 @@ def collect_trajectory(env, agent, device, max_steps=10000):
 def plot_visited_states(states):    
     states_cpu = states.cpu().numpy()
     plt.scatter(states_cpu[:, 0], states_cpu[:, 1])
+    plt.xlim(-1, 1)
+    plt.ylim(-1, 1)
     plt.show()
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000):
@@ -96,7 +98,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         end_time = time.time()
         loop_duration = end_time - start_time
         
-        print(f"Iteration {k}: Cost Loss = {reward_loss:.4f}, Policy Loss = {policy_loss:.4f}, average reward = {policy_rewards.mean().item()}, Loop Duration = {loop_duration:.4f} seconds")
+        print(f"Iteration {k}: Reward Loss = {reward_loss:.4f}, Policy Loss = {policy_loss:.4f}, average reward = {policy_rewards.mean().item()}, Loop Duration = {loop_duration:.4f} seconds")
 
         if k % 10 == 0:
             plot_visited_states(policy_states)
