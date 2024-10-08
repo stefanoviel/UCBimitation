@@ -50,10 +50,7 @@ class ImitationLearning:
     def update_reward(self, expert_states, expert_actions, policy_states, policy_actions, eta):
         expert_actions_one_hot = torch.nn.functional.one_hot(expert_actions, num_classes=self.action_dim)
         policy_actions_one_hot = torch.nn.functional.one_hot(policy_actions, num_classes=self.action_dim)
-        
-        # if we terminated there will be one more state than action because for the last state we don't have an action
-        expert_states = expert_states[:expert_actions_one_hot.shape[0]] 
-        policy_states = policy_states[:policy_actions_one_hot.shape[0]] 
+    
 
         expert_sa = torch.cat((expert_states, expert_actions_one_hot), dim=1)
         policy_sa = torch.cat((policy_states, policy_actions_one_hot), dim=1)
@@ -95,20 +92,24 @@ class ImitationLearning:
         z_opt.zero_grad()
         loss.backward()
         z_opt.step()
+
+        return loss.item()
     
-    def update_policy(self, states, eta):
+    def compute_q_values(self, states):
         states_expanded = states.unsqueeze(1).repeat(1, self.action_dim, 1)
         actions = torch.eye(self.action_dim, device=self.device).unsqueeze(0).repeat(states.shape[0], 1, 1)
         state_action_pairs = torch.cat([states_expanded, actions], dim=2)
 
         z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_networks])
-
         z_avg = torch.mean(z_values, dim=0)
         z_std = torch.std(z_values, dim=0)
 
         rewards = self.reward(state_action_pairs)
         
-        Q = rewards + z_avg + z_std
+        return rewards + z_avg + z_std
+    
+    def update_policy(self, states, eta):
+        Q = self.compute_q_values(states)
 
         logits = self.policy(states)
         current_probs = torch.softmax(logits, dim=-1)
@@ -122,17 +123,17 @@ class ImitationLearning:
         pg_loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
 
         # KL divergence loss to stay close to old policy
-        kl_loss = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))
+        kl_div = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))
 
         # Entropy loss to encourage exploration
         entropy = -torch.sum(current_probs * torch.log(current_probs + 1e-8), dim=1).mean()
 
         # Combined loss
-        loss = pg_loss + kl_loss - 0.1 * entropy
+        loss = pg_loss + kl_div - 0.1 * entropy
 
         self.policy_optimizer.zero_grad()
         loss.backward()
         self.policy_optimizer.step()
 
-        return loss.item()
+        return loss.item(), kl_div.item(), entropy.item()
 
