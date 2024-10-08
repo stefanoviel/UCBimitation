@@ -120,7 +120,7 @@ class ImitationLearning:
         # loss = torch.mean(torch.sum(current_probs * (-eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
 
         # Policy gradient loss
-        pg_loss = torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
+        pg_loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
 
         # KL divergence loss to stay close to old policy
         kl_div = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))

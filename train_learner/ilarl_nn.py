@@ -12,6 +12,7 @@ import torch.optim as optim
 import numpy as np
 from collections import defaultdict
 from models.ilarl_nn_models import TwoLayerNet, ImitationLearning
+from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter  # Import TensorBoard
 
 def parse_arguments():
@@ -74,9 +75,15 @@ def compute_gradient_norm(model):
     total_norm = total_norm ** (1. / 2)
     return total_norm
 
+
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000):
-    # Initialize TensorBoard writer
-    writer = SummaryWriter(log_dir="runs/imitation_learning")  # You can specify a folder to save logs
+    # Create a unique directory for this run
+    current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
+    log_dir = os.path.join("runs", f"imitation_learning_{current_time}")
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Initialize TensorBoard writer with the unique directory
+    writer = SummaryWriter(log_dir=log_dir)
 
     expert_states, expert_actions = load_expert_trajectories(expert_file)
 
@@ -175,4 +182,5 @@ if __name__ == "__main__":
     device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    il_agent = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed)
+    il_agent, metrics, log_dir = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed)
+    print(f"TensorBoard logs saved in: {log_dir}")
