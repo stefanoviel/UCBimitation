@@ -17,7 +17,7 @@ class TwoLayerNet(torch.nn.Module):
 
 
 class ImitationLearning:
-    def __init__(self, state_dim, action_dim, num_of_NNs, learning_rate=1e-2, device='cpu', seed=None):
+    def __init__(self, state_dim, action_dim, num_of_NNs, learning_rate=1e-3, device='cpu', seed=None):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_of_NNs = num_of_NNs

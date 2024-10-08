@@ -74,7 +74,9 @@ def plot_visited_states(states):
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000):
     expert_states, expert_actions = load_expert_trajectories(expert_file)
+    expert_states = np.array(expert_states)
     expert_states = torch.tensor(expert_states, device=device)
+    expert_actions = np.array(expert_actions)   
     expert_actions = torch.tensor(expert_actions, device=device)
     
     state_dim = env.observation_space.shape[0]
@@ -98,7 +100,6 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
             # TODO: you can't use real rewards here, because you don't know them
             il_agent.update_z_at_index(z_states, z_actions, z_rewards, args.gamma, args.eta, z_index)
         
-
         policy_loss = il_agent.update_policy(policy_states, args.eta)
         
         end_time = time.time()
