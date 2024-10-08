@@ -58,6 +58,11 @@ def collect_trajectory(env, agent, device, max_steps=10000):
 
         state_tensor = torch.tensor(next_state, dtype=torch.float32, device=device)
     
+    states = np.array(states)
+    actions = np.array(actions)
+    rewards = np.array(rewards)
+
+    # Then convert them to PyTorch tensors
     return torch.tensor(states, device=device), torch.tensor(actions, device=device), torch.tensor(rewards, device=device)
 
 def plot_visited_states(states):    
@@ -111,7 +116,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     env = create_environment(args)
     
-    device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     il_agent = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed)
