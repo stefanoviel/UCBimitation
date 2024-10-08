@@ -1,6 +1,10 @@
 
 import torch
 import torch.optim as optim
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import defaultdict
 
 
 class TwoLayerNet(torch.nn.Module):
@@ -112,7 +116,19 @@ class ImitationLearning:
         old_probs = current_probs.detach()
 
         # TODO: why without the - the loss gets minimized otherwise it gets maximized
-        loss = torch.mean(torch.sum(current_probs * (-eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
+        # loss = torch.mean(torch.sum(current_probs * (-eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
+
+        # Policy gradient loss
+        pg_loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
+
+        # KL divergence loss to stay close to old policy
+        kl_loss = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))
+
+        # Entropy loss to encourage exploration
+        entropy = -torch.sum(current_probs * torch.log(current_probs + 1e-8), dim=1).mean()
+
+        # Combined loss
+        loss = pg_loss + kl_loss - 0.1 * entropy
 
         self.policy_optimizer.zero_grad()
         loss.backward()

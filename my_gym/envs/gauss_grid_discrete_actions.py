@@ -180,7 +180,7 @@ class DiscreteGaussianGridWorld(gym.Env):
         if env_type == 0:
             self.terminal_area = np.array([[-1.0, -0.95], [0.95, 1.0]])
         else:
-            self.terminal_area = np.array([[0.95, 1.0], [-1.0, -0.95]])
+            self.terminal_area = np.array([[0.85, 1.0], [-1.0, -0.85]])
 
 
     def seed(self, seed=None):
@@ -284,5 +284,5 @@ class DiscreteGaussianGridWorld(gym.Env):
                 0, 1] and
                     self.terminal_area[1, 0] <= self.state[1] <=
                     self.terminal_area[1, 1]):
-                reward += 100
+                reward += 2000
         return reward # we add the minus because we are using reward and not cost

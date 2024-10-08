@@ -11,7 +11,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+
 from models.ilarl_nn_models import TwoLayerNet, ImitationLearning
+
 
 
 def parse_arguments():
@@ -74,6 +76,7 @@ def plot_visited_states(states):
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000):
     expert_states, expert_actions = load_expert_trajectories(expert_file)
+
     expert_states = np.array(expert_states)
     expert_states = torch.tensor(expert_states, device=device)
     expert_actions = np.array(expert_actions)   
