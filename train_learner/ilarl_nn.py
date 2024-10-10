@@ -27,7 +27,7 @@ def parse_arguments():
     parser.add_argument('--num-of-NNs', type=int, default=5, metavar='N',
                         help='number of neural networks to use')
     parser.add_argument('--seed', type=int, default=1, metavar='N')
-    parser.add_argument('--eta', type=float, default=1, metavar='G')
+    parser.add_argument('--eta', type=float, default=10, metavar='G')
     parser.add_argument('--gamma', type=float, default=0.99, metavar='G')
     return parser.parse_args()
 
@@ -103,13 +103,12 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         expert_traj_states = expert_states[-1]
         expert_traj_actions = expert_actions[-1]
         
-        policy_states, policy_actions, policy_rewards = collect_trajectory(env, il_agent, device, max_steps)
+        policy_states, policy_actions, true_policy_rewards = collect_trajectory(env, il_agent, device, max_steps)
 
         expert_traj_states = expert_traj_states[:expert_traj_actions.shape[0], :] 
         policy_states = policy_states[:policy_actions.shape[0], :] 
         
         reward_loss = il_agent.update_reward(expert_traj_states, expert_traj_actions, policy_states, policy_actions, args.eta)
-        metrics['reward_loss'].append(reward_loss)
         writer.add_scalar('Loss/Reward Loss', reward_loss, k)
         
         z_losses = []
@@ -117,50 +116,32 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
             z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, device, max_steps)
             z_loss = il_agent.update_z_at_index(z_states, z_actions, z_rewards, args.gamma, args.eta, z_index)
             z_losses.append(z_loss)
-        metrics['z_losses'].append(z_losses)
         writer.add_scalars(f'Loss/Z Losses', {f'Z Net {i}': loss for i, loss in enumerate(z_losses)}, k)
 
         policy_loss, kl_div, entropy = il_agent.update_policy(policy_states, args.eta)
-        metrics['policy_loss'].append(policy_loss)
-        metrics['kl_divergence'].append(kl_div)
-        metrics['entropy'].append(entropy)
         
         writer.add_scalar('Loss/Policy Loss', policy_loss, k)
-        writer.add_scalar('Metrics/KL Divergence', kl_div, k)
-        writer.add_scalar('Metrics/Entropy', entropy, k)
         
-        expert_reward = il_agent.reward(torch.cat((expert_traj_states, torch.nn.functional.one_hot(expert_traj_actions, num_classes=action_dim).float()), dim=1)).mean().item()
-        policy_reward = il_agent.reward(torch.cat((policy_states, torch.nn.functional.one_hot(policy_actions, num_classes=action_dim).float()), dim=1)).mean().item()
-        metrics['expert_reward'].append(expert_reward)
-        metrics['policy_reward'].append(policy_reward)
-        
-        writer.add_scalar('Reward/Expert Reward', expert_reward, k)
-        writer.add_scalar('Reward/Policy Reward', policy_reward, k)
+        estimated_expert_reward = il_agent.reward(torch.cat((expert_traj_states, torch.nn.functional.one_hot(expert_traj_actions, num_classes=action_dim).float()), dim=1)).mean().item()
+        estimated_policy_reward = il_agent.reward(torch.cat((policy_states, torch.nn.functional.one_hot(policy_actions, num_classes=action_dim).float()), dim=1)).mean().item()        
+        writer.add_scalar('Reward/Estimated Mean Expert Reward', estimated_expert_reward, k)
+        writer.add_scalar('Reward/Estimated Mean Policy Reward', estimated_policy_reward, k)
         
         q_values = il_agent.compute_q_values(policy_states)
-        metrics['avg_q_value'].append(q_values.mean().item())
+
         writer.add_scalar('Metrics/Avg Q-value', q_values.mean().item(), k)
         
         action_probs = torch.softmax(il_agent.policy(policy_states), dim=-1)
-        metrics['action_distribution'].append(action_probs.mean(dim=0).detach().numpy())
+        writer.add_histogram('Action Distribution', action_probs, k)
         
-        z_values = torch.stack([z_net(torch.cat((policy_states, torch.nn.functional.one_hot(policy_actions, num_classes=action_dim).float()), dim=1)) for z_net in il_agent.z_networks])
-        metrics['z_mean'].append(z_values.mean().item())
-        metrics['z_std'].append(z_values.std().item())
-        
+        z_values = torch.stack([z_net(torch.cat((policy_states, torch.nn.functional.one_hot(policy_actions, num_classes=action_dim).float()), dim=1)) for z_net in il_agent.z_networks])        
         writer.add_scalar('Metrics/Z Mean', z_values.mean().item(), k)
         writer.add_scalar('Metrics/Z Std', z_values.std().item(), k)
         
-        metrics['episodic_return'].append(policy_rewards.sum().item())
-        writer.add_scalar('Metrics/Episodic Return', policy_rewards.sum().item(), k)
+        writer.add_scalar('Reward/True Mean policy Reward', true_policy_rewards.mean().item(), k)
         
-        metrics['policy_lr'].append(il_agent.policy_optimizer.param_groups[0]['lr'])
-        metrics['reward_lr'].append(il_agent.reward_optimizer.param_groups[0]['lr'])
-
         policy_grad_norm = compute_gradient_norm(il_agent.policy)
         reward_grad_norm = compute_gradient_norm(il_agent.reward)
-        metrics['policy_grad_norm'].append(policy_grad_norm)
-        metrics['reward_grad_norm'].append(reward_grad_norm)
         
         writer.add_scalar('Gradients/Policy Gradient Norm', policy_grad_norm, k)
         writer.add_scalar('Gradients/Reward Gradient Norm', reward_grad_norm, k)
@@ -169,7 +150,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         loop_duration = end_time - start_time
         
         print(f"Iteration {k}: Reward Loss = {reward_loss:.4f}, Policy Loss = {policy_loss:.4f}, "
-              f"Avg Q-value = {metrics['avg_q_value'][-1]:.4f}, Entropy = {entropy:.4f}, "
+              f"Avg Q-value = {q_values.mean().item():.4f}, Estimated Mean Policy reward = {estimated_policy_reward:.4f}, True Mean Episodic Return = {true_policy_rewards.mean().item():.4f}, "
               f"Loop Duration = {loop_duration:.4f} seconds")
 
     return il_agent, metrics

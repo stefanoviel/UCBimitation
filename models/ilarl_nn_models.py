@@ -126,7 +126,8 @@ class ImitationLearning:
         kl_div = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))
 
         # Entropy loss to encourage exploration
-        entropy = -torch.sum(current_probs * torch.log(current_probs + 1e-8), dim=1).mean()
+        # entropy = -torch.sum(current_probs * torch.log(current_probs + 1e-8), dim=1).mean()
+        entropy = torch.tensor(0.0)
 
         # Combined loss
         loss = pg_loss + kl_div - 0.1 * entropy
