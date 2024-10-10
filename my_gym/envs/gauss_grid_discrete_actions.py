@@ -180,7 +180,7 @@ class DiscreteGaussianGridWorld(gym.Env):
         if env_type == 0:
             self.terminal_area = np.array([[-1.0, -0.95], [0.95, 1.0]])
         else:
-            self.terminal_area = np.array([[0.85, 1.0], [-1.0, -0.85]])
+            self.terminal_area = np.array([[0.95, 1.0], [-1.0, -0.95]])
 
 
     def seed(self, seed=None):

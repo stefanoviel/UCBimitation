@@ -146,6 +146,13 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         writer.add_scalar('Gradients/Policy Gradient Norm', policy_grad_norm, k)
         writer.add_scalar('Gradients/Reward Gradient Norm', reward_grad_norm, k)
 
+        # Calculate the Euclidean distance between the expert and policy state means
+        expert_state_mean = expert_traj_states.mean(dim=0)
+        policy_state_mean = policy_states.mean(dim=0)
+        
+        state_distance = torch.norm(expert_state_mean - policy_state_mean).item()
+        writer.add_scalar('Metrics/State Visitation Distance', state_distance, k)
+
         end_time = time.time()
         loop_duration = end_time - start_time
         

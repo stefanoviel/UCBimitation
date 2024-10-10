@@ -51,7 +51,6 @@ class ImitationLearning:
         expert_actions_one_hot = torch.nn.functional.one_hot(expert_actions, num_classes=self.action_dim)
         policy_actions_one_hot = torch.nn.functional.one_hot(policy_actions, num_classes=self.action_dim)
     
-
         expert_sa = torch.cat((expert_states, expert_actions_one_hot), dim=1)
         policy_sa = torch.cat((policy_states, policy_actions_one_hot), dim=1)
         
