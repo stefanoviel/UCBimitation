@@ -95,7 +95,8 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
     
     il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, device=device, seed=seed)
     
-    metrics = defaultdict(list)
+
+    all_true_rewards = []
     
     for k in range(max_iter_num):
         start_time = time.time()
@@ -104,6 +105,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         expert_traj_actions = expert_actions[-1]
         
         policy_states, policy_actions, true_policy_rewards = collect_trajectory(env, il_agent, device, max_steps)
+        all_true_rewards.append(true_policy_rewards.mean().item())
 
         expert_traj_states = expert_traj_states[:expert_traj_actions.shape[0], :] 
         policy_states = policy_states[:policy_actions.shape[0], :] 
@@ -162,7 +164,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
               f"Avg Q-value = {q_values.mean().item():.4f}, Estimated Mean Policy reward = {estimated_policy_reward:.4f}, True Mean Episodic Return = {true_policy_rewards.mean().item():.4f}, "
               f"Loop Duration = {loop_duration:.4f} seconds")
 
-    return il_agent, metrics
+    return il_agent, all_true_rewards
 
 
 if __name__ == "__main__":
@@ -172,5 +174,11 @@ if __name__ == "__main__":
     device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    il_agent, metrics, log_dir = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed)
-    print(f"TensorBoard logs saved in: {log_dir}")
+    il_agent, all_true_rewards = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed)
+
+    # open a csv common to all run and save true rewards together with the run parameters and date
+    with open("runs/true_rewards.csv", "a") as file:
+        if file.tell() == 0:  # Check if the file is empty to write the header
+            file.write("timestamp,env_name,noiseE,grid_type,expert_trajs,max_iter_num,num_of_NNs,seed,eta,gamma,true_rewards\n")
+        file.write(f"{datetime.now()},{args.env_name},{args.noiseE},{args.grid_type},{args.expert_trajs},{args.max_iter_num},{args.num_of_NNs},{args.seed},{args.eta},{args.gamma},{all_true_rewards}\n")
+    
