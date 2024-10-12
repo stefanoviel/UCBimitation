@@ -120,7 +120,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
             z_losses.append(z_loss)
         writer.add_scalars(f'Loss/Z Losses', {f'Z Net {i}': loss for i, loss in enumerate(z_losses)}, k)
 
-        policy_loss, kl_div, entropy = il_agent.update_policy(policy_states, args.eta)
+        policy_loss, kl_div = il_agent.update_policy(policy_states, args.eta)
         
         writer.add_scalar('Loss/Policy Loss', policy_loss, k)
         
