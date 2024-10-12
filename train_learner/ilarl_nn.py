@@ -113,8 +113,10 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         
         z_losses = []
         for z_index in range(num_of_NNs):
-            z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, device, max_steps)
-            z_loss = il_agent.update_z_at_index(z_states, z_actions, z_rewards, args.gamma, args.eta, z_index)
+            z_states, z_actions, _ = collect_trajectory(env, il_agent, device, max_steps)
+
+            estimated_z_rewards = il_agent.reward(torch.cat((z_states, torch.nn.functional.one_hot(z_actions, num_classes=action_dim).float()), dim=1)) 
+            z_loss = il_agent.update_z_at_index(z_states, z_actions, estimated_z_rewards, args.gamma, args.eta, z_index)
             z_losses.append(z_loss)
         writer.add_scalars(f'Loss/Z Losses', {f'Z Net {i}': loss for i, loss in enumerate(z_losses)}, k)
 

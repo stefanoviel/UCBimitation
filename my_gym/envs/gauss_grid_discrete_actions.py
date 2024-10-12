@@ -284,5 +284,5 @@ class DiscreteGaussianGridWorld(gym.Env):
                 0, 1] and
                     self.terminal_area[1, 0] <= self.state[1] <=
                     self.terminal_area[1, 1]):
-                reward += 2000
+                reward += 80
         return reward # we add the minus because we are using reward and not cost
