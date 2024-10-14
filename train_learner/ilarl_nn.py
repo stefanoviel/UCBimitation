@@ -180,5 +180,5 @@ if __name__ == "__main__":
     with open("runs/true_rewards.csv", "a") as file:
         if file.tell() == 0:  # Check if the file is empty to write the header
             file.write("timestamp,env_name,noiseE,grid_type,expert_trajs,max_iter_num,num_of_NNs,seed,eta,gamma,true_rewards\n")
-        file.write(f"{datetime.now()},{args.env_name},{args.noiseE},{args.grid_type},{args.expert_trajs},{args.max_iter_num},{args.num_of_NNs},{args.seed},{args.eta},{args.gamma},{all_true_rewards}\n")
+        file.write(f"{datetime.now()},{args.env_name},{args.noiseE},{args.grid_type},{args.expert_trajs},{args.max_iter_num},{args.num_of_NNs},{args.seed},{args.eta},{args.gamma},{np.mean(all_true_rewards)}\n")
     
