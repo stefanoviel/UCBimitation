@@ -1,13 +1,10 @@
-teh last reward doens't get used
-read other similar paper, just to get an idea
+plot with different number of NNs and see how performance change. Not really, maybe more NNs? probably a problem with stability
+    maybe use the mean Q value over the episode
+implement experience replay both for policy and Z NNs for increased stability. Learning happens on a random sample
 
 
 
-does it work with reward network?
-plot with different number of NNs and see how performance change
 keep update in memory (different dataset between different NN) to increase stability. Make it optional (on policy - off policy). does it improve? 
-
-codice per le routine di estimation of the different parts
 
 
 questions: 
