@@ -29,6 +29,12 @@ def parse_arguments():
     parser.add_argument('--seed', type=int, default=1, metavar='N')
     parser.add_argument('--eta', type=float, default=10, metavar='G')
     parser.add_argument('--gamma', type=float, default=0.99, metavar='G')
+    parser.add_argument('--use-memory-replay', action='store_true',
+                        help='use memory replay for policy updates')
+    parser.add_argument('--buffer-size', type=int, default=2000, metavar='N',
+                        help='size of the replay buffer')
+    parser.add_argument('--batch-size', type=int, default=50, metavar='N',
+                        help='batch size for policy updates')
     return parser.parse_args()
 
 def create_environment(args):
@@ -160,7 +166,8 @@ def log_iteration_summary(k, data, policy_loss, reward_loss, q_values, estimated
           f"Loop Duration = {duration:.4f} seconds")
 
 
-def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000):
+def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000, 
+                           use_memory_replay=False, buffer_size=2000, batch_size=50):
     log_dir = setup_logging()
     writer = SummaryWriter(log_dir=log_dir)
 
@@ -169,7 +176,8 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
     
-    il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, device=device, seed=seed)
+    il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, device=device, seed=seed, 
+                                 use_memory_replay=use_memory_replay, buffer_size=buffer_size, batch_size=batch_size)
 
     all_true_rewards = []
     
@@ -179,10 +187,28 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         iteration_data = collect_iteration_data(env, il_agent, expert_states, expert_actions, device, max_steps)
         all_true_rewards.append(iteration_data['true_policy_rewards'].mean().item())
 
-        reward_loss = update_reward_and_z_networks(il_agent, iteration_data, args, writer, k, num_of_NNs, action_dim)
+        if use_memory_replay:
+            # Add experiences to replay buffer
+            for i in range(len(iteration_data['policy_states'])):
+                il_agent.add_experience(
+                    iteration_data['policy_states'][i],
+                    iteration_data['policy_actions'][i],
+                    iteration_data['true_policy_rewards'][i],
+                    iteration_data['policy_states'][i+1] if i+1 < len(iteration_data['policy_states']) else None,
+                    i+1 == len(iteration_data['policy_states'])
+                )
 
-        policy_loss, kl_div = il_agent.update_policy(iteration_data['policy_states'], args.eta)
-        writer.add_scalar('Loss/Policy Loss', policy_loss, k)
+            # Update policy using replay buffer
+            policy_loss, kl_div = il_agent.update_policy(args.eta)
+        else:
+            # Update policy using current iteration data
+            policy_loss, kl_div = il_agent.update_policy_without_replay(
+                iteration_data['policy_states'], 
+                iteration_data['policy_actions'], 
+                args.eta
+            )
+
+        reward_loss = update_reward_and_z_networks(il_agent, iteration_data, args, writer, k, num_of_NNs, action_dim)
 
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
         
@@ -194,13 +220,10 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
 
         log_state_visitation_distance(iteration_data, writer, k)
 
-
         end_time = time.time()
         log_iteration_summary(k, iteration_data, policy_loss, reward_loss, q_values, estimated_policy_reward, end_time - start_time)
 
     return il_agent, all_true_rewards
-
-
 
 if __name__ == "__main__":
     args = parse_arguments()
@@ -209,11 +232,15 @@ if __name__ == "__main__":
     device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    il_agent, all_true_rewards = run_imitation_learning(env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed)
+    il_agent, all_true_rewards = run_imitation_learning(
+        env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed,
+        use_memory_replay=args.use_memory_replay,
+        buffer_size=args.buffer_size,
+        batch_size=args.batch_size
+    )
 
     # open a csv common to all run and save true rewards together with the run parameters and date
     with open("runs/true_rewards.csv", "a") as file:
         if file.tell() == 0:  # Check if the file is empty to write the header
             file.write("timestamp,env_name,noiseE,grid_type,expert_trajs,max_iter_num,num_of_NNs,seed,eta,gamma,true_rewards\n")
         file.write(f"{datetime.now()},{args.env_name},{args.noiseE},{args.grid_type},{args.expert_trajs},{args.max_iter_num},{args.num_of_NNs},{args.seed},{args.eta},{args.gamma},{np.mean(all_true_rewards)}\n")
-    

@@ -1,10 +1,10 @@
-
 import torch
 import torch.optim as optim
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
+from train_learner.ReplayBuffer import ReplayBuffer
 
 
 class TwoLayerNet(torch.nn.Module):
@@ -21,7 +21,8 @@ class TwoLayerNet(torch.nn.Module):
 
 
 class ImitationLearning:
-    def __init__(self, state_dim, action_dim, num_of_NNs, learning_rate=1e-3, device='cpu', seed=None):
+    def __init__(self, state_dim, action_dim, num_of_NNs, learning_rate=1e-3, device='cpu', seed=None, 
+                 use_memory_replay=False, buffer_size=2000, batch_size=50):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_of_NNs = num_of_NNs
@@ -40,6 +41,11 @@ class ImitationLearning:
         self.reward_optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate)
         self.z_optimizers = [optim.Adam(net.parameters(), lr=learning_rate) for net in self.z_networks]
         
+        self.use_memory_replay = use_memory_replay
+        if use_memory_replay:
+            self.replay_buffer = ReplayBuffer(buffer_size)
+            self.batch_size = batch_size
+    
     def select_action(self, state):
         with torch.no_grad():
             logits = self.policy(state)
@@ -107,7 +113,24 @@ class ImitationLearning:
         
         return rewards + z_avg + z_std
     
-    def update_policy(self, states, eta):
+    def update_policy(self, eta):
+        if self.use_memory_replay:
+            return self.update_policy_with_replay(eta)
+        else:
+            raise ValueError("This method should not be called when memory replay is disabled.")
+
+    def update_policy_with_replay(self, eta):
+        if len(self.replay_buffer) < self.batch_size:
+            return 0, 0  # Not enough samples to update
+
+        states, actions, rewards, next_states, _ = self.replay_buffer.sample(self.batch_size)
+        
+        return self._compute_policy_update(states, actions, eta)
+
+    def update_policy_without_replay(self, states, actions, eta):
+        return self._compute_policy_update(states, actions, eta)
+
+    def _compute_policy_update(self, states, actions, eta):
         Q = self.compute_q_values(states)
 
         logits = self.policy(states)
@@ -115,15 +138,11 @@ class ImitationLearning:
         
         old_probs = current_probs.detach()
 
-        # TODO: why without the - the loss gets minimized otherwise it gets maximized
-        # loss = torch.mean(torch.sum(current_probs * (-eta * Q.squeeze(-1) + torch.log(current_probs) - torch.log(old_probs)), dim=1))
-
         # Policy gradient loss
         pg_loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
 
         # KL divergence loss to stay close to old policy
         kl_div = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))
-
 
         # Combined loss
         loss = pg_loss + kl_div
@@ -132,5 +151,8 @@ class ImitationLearning:
         loss.backward()
         self.policy_optimizer.step()
 
-        return loss.item(), kl_div.item(), 
+        return loss.item(), kl_div.item()
 
+    def add_experience(self, state, action, reward, next_state, done):
+        if self.use_memory_replay:
+            self.replay_buffer.push(state, action, reward, next_state, done)
