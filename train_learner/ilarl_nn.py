@@ -75,96 +75,131 @@ def compute_gradient_norm(model):
     total_norm = total_norm ** (1. / 2)
     return total_norm
 
-
-def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000):
-    # Create a unique directory for this run
+def setup_logging():
     current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
     log_dir = os.path.join("runs", f"imitation_learning_{current_time}")
     os.makedirs(log_dir, exist_ok=True)
+    return log_dir
 
-    # Initialize TensorBoard writer with the unique directory
+def load_and_preprocess_expert_data(expert_file, device):
+    expert_states, expert_actions = load_expert_trajectories(expert_file)
+    return torch.tensor(np.array(expert_states), device=device), torch.tensor(np.array(expert_actions), device=device)
+
+def collect_iteration_data(env, il_agent, expert_states, expert_actions, device, max_steps):
+    expert_traj_states = expert_states[-1]
+    expert_traj_actions = expert_actions[-1]
+    
+    policy_states, policy_actions, true_policy_rewards = collect_trajectory(env, il_agent, device, max_steps)
+
+    return {
+        'expert_traj_states': expert_traj_states[:expert_traj_actions.shape[0], :],
+        'expert_traj_actions': expert_traj_actions,
+        'policy_states': policy_states[:policy_actions.shape[0], :],
+        'policy_actions': policy_actions,
+        'true_policy_rewards': true_policy_rewards
+    }
+
+def update_reward_and_z_networks(il_agent, data, args, writer, k, num_of_NNs, action_dim):
+    reward_loss = il_agent.update_reward(data['expert_traj_states'], data['expert_traj_actions'], 
+                                         data['policy_states'], data['policy_actions'], args.eta)
+    writer.add_scalar('Loss/Reward Loss', reward_loss, k)
+    
+    z_losses = []
+    for z_index in range(num_of_NNs):
+        z_states, z_actions, _ = collect_trajectory(env, il_agent, device)
+        estimated_z_rewards = il_agent.reward(torch.cat((z_states, torch.nn.functional.one_hot(z_actions, num_classes=action_dim).float()), dim=1)) 
+        z_loss = il_agent.update_z_at_index(z_states, z_actions, estimated_z_rewards, args.gamma, args.eta, z_index)
+        z_losses.append(z_loss)
+    writer.add_scalars(f'Loss/Z Losses', {f'Z Net {i}': loss for i, loss in enumerate(z_losses)}, k)
+
+    return reward_loss
+
+def log_rewards_and_q_values(il_agent, data, writer, k, action_dim):
+    estimated_expert_reward = il_agent.reward(torch.cat((data['expert_traj_states'], 
+                              torch.nn.functional.one_hot(data['expert_traj_actions'], num_classes=action_dim).float()), dim=1)).mean().item()
+    estimated_policy_reward = il_agent.reward(torch.cat((data['policy_states'], 
+                              torch.nn.functional.one_hot(data['policy_actions'], num_classes=action_dim).float()), dim=1)).mean().item()        
+    writer.add_scalar('Reward/Estimated Mean Expert Reward', estimated_expert_reward, k)
+    writer.add_scalar('Reward/Estimated Mean Policy Reward', estimated_policy_reward, k)
+    
+    q_values = il_agent.compute_q_values(data['policy_states'])
+    writer.add_scalar('Metrics/Avg Q-value', q_values.mean().item(), k)
+
+    return q_values, estimated_policy_reward
+
+def log_action_distribution(il_agent, policy_states, writer, k):
+    action_probs = torch.softmax(il_agent.policy(policy_states), dim=-1)
+    writer.add_histogram('Action Distribution', action_probs, k)
+
+def log_z_values(il_agent, data, writer, k, action_dim):
+    z_values = torch.stack([z_net(torch.cat((data['policy_states'], 
+                torch.nn.functional.one_hot(data['policy_actions'], num_classes=action_dim).float()), dim=1)) 
+                for z_net in il_agent.z_networks])        
+    writer.add_scalar('Metrics/Z Mean', z_values.mean().item(), k)
+    writer.add_scalar('Metrics/Z Std', z_values.std().item(), k)
+
+def log_gradient_norms(il_agent, writer, k):
+    policy_grad_norm = compute_gradient_norm(il_agent.policy)
+    reward_grad_norm = compute_gradient_norm(il_agent.reward)
+    writer.add_scalar('Gradients/Policy Gradient Norm', policy_grad_norm, k)
+    writer.add_scalar('Gradients/Reward Gradient Norm', reward_grad_norm, k)
+
+def log_state_visitation_distance(data, writer, k):
+    expert_state_mean = data['expert_traj_states'].mean(dim=0)
+    policy_state_mean = data['policy_states'].mean(dim=0)
+    state_distance = torch.norm(expert_state_mean - policy_state_mean).item()
+    writer.add_scalar('Metrics/State Visitation Distance', state_distance, k)
+
+def log_iteration_summary(k, data, policy_loss, reward_loss, q_values, estimated_policy_reward, duration):
+    print(f"Iteration {k}: "
+          f"Reward Loss = {reward_loss:.4f}, "
+          f"Policy Loss = {policy_loss:.4f}, "
+          f"Avg Q-value = {q_values.mean().item():.4f}, "
+          f"Estimated Mean Policy reward = {estimated_policy_reward:.4f}, "
+          f"True Mean Episodic Return = {data['true_policy_rewards'].mean().item():.4f}, "
+          f"Loop Duration = {duration:.4f} seconds")
+
+
+def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000):
+    log_dir = setup_logging()
     writer = SummaryWriter(log_dir=log_dir)
 
-    expert_states, expert_actions = load_expert_trajectories(expert_file)
-
-    expert_states = torch.tensor(np.array(expert_states), device=device)
-    expert_actions = torch.tensor(np.array(expert_actions), device=device)
+    expert_states, expert_actions = load_and_preprocess_expert_data(expert_file, device)
     
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
     
     il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, device=device, seed=seed)
-    
 
     all_true_rewards = []
     
     for k in range(max_iter_num):
         start_time = time.time()
 
-        expert_traj_states = expert_states[-1]
-        expert_traj_actions = expert_actions[-1]
-        
-        policy_states, policy_actions, true_policy_rewards = collect_trajectory(env, il_agent, device, max_steps)
-        all_true_rewards.append(true_policy_rewards.mean().item())
+        iteration_data = collect_iteration_data(env, il_agent, expert_states, expert_actions, device, max_steps)
+        all_true_rewards.append(iteration_data['true_policy_rewards'].mean().item())
 
-        expert_traj_states = expert_traj_states[:expert_traj_actions.shape[0], :] 
-        policy_states = policy_states[:policy_actions.shape[0], :] 
-        
-        reward_loss = il_agent.update_reward(expert_traj_states, expert_traj_actions, policy_states, policy_actions, args.eta)
-        writer.add_scalar('Loss/Reward Loss', reward_loss, k)
-        
-        z_losses = []
-        for z_index in range(num_of_NNs):
-            z_states, z_actions, _ = collect_trajectory(env, il_agent, device, max_steps)
+        reward_loss = update_reward_and_z_networks(il_agent, iteration_data, args, writer, k, num_of_NNs, action_dim)
 
-            estimated_z_rewards = il_agent.reward(torch.cat((z_states, torch.nn.functional.one_hot(z_actions, num_classes=action_dim).float()), dim=1)) 
-            z_loss = il_agent.update_z_at_index(z_states, z_actions, estimated_z_rewards, args.gamma, args.eta, z_index)
-            z_losses.append(z_loss)
-        writer.add_scalars(f'Loss/Z Losses', {f'Z Net {i}': loss for i, loss in enumerate(z_losses)}, k)
-
-        policy_loss, kl_div = il_agent.update_policy(policy_states, args.eta)
-        
+        policy_loss, kl_div = il_agent.update_policy(iteration_data['policy_states'], args.eta)
         writer.add_scalar('Loss/Policy Loss', policy_loss, k)
-        
-        estimated_expert_reward = il_agent.reward(torch.cat((expert_traj_states, torch.nn.functional.one_hot(expert_traj_actions, num_classes=action_dim).float()), dim=1)).mean().item()
-        estimated_policy_reward = il_agent.reward(torch.cat((policy_states, torch.nn.functional.one_hot(policy_actions, num_classes=action_dim).float()), dim=1)).mean().item()        
-        writer.add_scalar('Reward/Estimated Mean Expert Reward', estimated_expert_reward, k)
-        writer.add_scalar('Reward/Estimated Mean Policy Reward', estimated_policy_reward, k)
-        
-        q_values = il_agent.compute_q_values(policy_states)
 
-        writer.add_scalar('Metrics/Avg Q-value', q_values.mean().item(), k)
+        q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
         
-        action_probs = torch.softmax(il_agent.policy(policy_states), dim=-1)
-        writer.add_histogram('Action Distribution', action_probs, k)
+        log_action_distribution(il_agent, iteration_data['policy_states'], writer, k)
         
-        z_values = torch.stack([z_net(torch.cat((policy_states, torch.nn.functional.one_hot(policy_actions, num_classes=action_dim).float()), dim=1)) for z_net in il_agent.z_networks])        
-        writer.add_scalar('Metrics/Z Mean', z_values.mean().item(), k)
-        writer.add_scalar('Metrics/Z Std', z_values.std().item(), k)
+        log_z_values(il_agent, iteration_data, writer, k, action_dim)
         
-        writer.add_scalar('Reward/True Mean policy Reward', true_policy_rewards.mean().item(), k)
-        
-        policy_grad_norm = compute_gradient_norm(il_agent.policy)
-        reward_grad_norm = compute_gradient_norm(il_agent.reward)
-        
-        writer.add_scalar('Gradients/Policy Gradient Norm', policy_grad_norm, k)
-        writer.add_scalar('Gradients/Reward Gradient Norm', reward_grad_norm, k)
+        log_gradient_norms(il_agent, writer, k)
 
-        # Calculate the Euclidean distance between the expert and policy state means
-        expert_state_mean = expert_traj_states.mean(dim=0)
-        policy_state_mean = policy_states.mean(dim=0)
-        
-        state_distance = torch.norm(expert_state_mean - policy_state_mean).item()
-        writer.add_scalar('Metrics/State Visitation Distance', state_distance, k)
+        log_state_visitation_distance(iteration_data, writer, k)
+
 
         end_time = time.time()
-        loop_duration = end_time - start_time
-        
-        print(f"Iteration {k}: Reward Loss = {reward_loss:.4f}, Policy Loss = {policy_loss:.4f}, "
-              f"Avg Q-value = {q_values.mean().item():.4f}, Estimated Mean Policy reward = {estimated_policy_reward:.4f}, True Mean Episodic Return = {true_policy_rewards.mean().item():.4f}, "
-              f"Loop Duration = {loop_duration:.4f} seconds")
+        log_iteration_summary(k, iteration_data, policy_loss, reward_loss, q_values, estimated_policy_reward, end_time - start_time)
 
     return il_agent, all_true_rewards
+
 
 
 if __name__ == "__main__":
