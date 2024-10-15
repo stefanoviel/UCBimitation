@@ -188,9 +188,9 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         all_true_rewards.append(iteration_data['true_policy_rewards'].mean().item())
 
         if use_memory_replay:
-            # Add experiences to replay buffer
+            # Add experiences to policy replay buffer
             for i in range(len(iteration_data['policy_states'])):
-                il_agent.add_experience(
+                il_agent.add_policy_experience(
                     iteration_data['policy_states'][i],
                     iteration_data['policy_actions'][i],
                     iteration_data['true_policy_rewards'][i],
@@ -208,7 +208,29 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
                 args.eta
             )
 
-        reward_loss = update_reward_and_z_networks(il_agent, iteration_data, args, writer, k, num_of_NNs, action_dim)
+        reward_loss = il_agent.update_reward(iteration_data['expert_traj_states'], iteration_data['expert_traj_actions'], 
+                                             iteration_data['policy_states'], iteration_data['policy_actions'], args.eta)
+
+        z_losses = []
+        for z_index in range(num_of_NNs):
+            if use_memory_replay:
+                # Collect new experiences for z network
+                z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, device)
+                for i in range(len(z_states)):
+                    il_agent.add_z_experience(
+                        z_states[i],
+                        z_actions[i],
+                        z_rewards[i],
+                        z_states[i+1] if i+1 < len(z_states) else None,
+                        i+1 == len(z_states),
+                        z_index
+                    )
+                z_loss = il_agent.update_z_at_index(None, None, None, args.gamma, args.eta, z_index)
+            else:
+                z_states, z_actions, _ = collect_trajectory(env, il_agent, device)
+                estimated_z_rewards = il_agent.reward(torch.cat((z_states, torch.nn.functional.one_hot(z_actions, num_classes=action_dim).float()), dim=1))
+                z_loss = il_agent.update_z_at_index(z_states, z_actions, estimated_z_rewards, args.gamma, args.eta, z_index)
+            z_losses.append(z_loss)
 
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
         

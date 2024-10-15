@@ -43,7 +43,8 @@ class ImitationLearning:
         
         self.use_memory_replay = use_memory_replay
         if use_memory_replay:
-            self.replay_buffer = ReplayBuffer(buffer_size)
+            self.policy_replay_buffer = ReplayBuffer(buffer_size)
+            self.z_replay_buffers = [ReplayBuffer(buffer_size) for _ in range(num_of_NNs)]
             self.batch_size = batch_size
     
     def select_action(self, state):
@@ -78,6 +79,12 @@ class ImitationLearning:
         return loss.item()
     
     def update_z_at_index(self, states, actions, rewards, gamma, eta, z_index):
+        if self.use_memory_replay:
+            return self.update_z_with_replay(gamma, eta, z_index)
+        else:
+            return self.update_z_without_replay(states, actions, rewards, gamma, eta, z_index)
+
+    def update_z_without_replay(self, states, actions, rewards, gamma, eta, z_index):
         actions_one_hot = torch.nn.functional.one_hot(actions, num_classes=self.action_dim)
         sa = torch.cat((states, actions_one_hot.float()), dim=1)
 
@@ -88,8 +95,8 @@ class ImitationLearning:
         
         discounted_future_rewards = torch.zeros_like(rewards)
         running_sum = 0
-        for t in reversed(range(len(rewards))):  # start from the last reward
-            running_sum = rewards[t] + gamma * running_sum  # add the reward and the discounted sum of future rewards
+        for t in reversed(range(len(rewards))):
+            running_sum = rewards[t] + gamma * running_sum
             discounted_future_rewards[t] = running_sum
         
         loss = torch.mean((z_values - discounted_future_rewards)**2)
@@ -99,7 +106,35 @@ class ImitationLearning:
         z_opt.step()
 
         return loss.item()
-    
+
+    def update_z_with_replay(self, gamma, eta, z_index):
+        if len(self.z_replay_buffers[z_index]) < self.batch_size:
+            return 0  # Not enough samples to update
+
+        states, actions, rewards, next_states, dones = self.z_replay_buffers[z_index].sample(self.batch_size)
+        
+        actions_one_hot = torch.nn.functional.one_hot(actions, num_classes=self.action_dim)
+        sa = torch.cat((states, actions_one_hot.float()), dim=1)
+
+        z_net = self.z_networks[z_index]
+        z_opt = self.z_optimizers[z_index]
+        
+        z_values = z_net(sa).squeeze()
+        next_z_values = z_net(torch.cat((next_states, actions_one_hot.float()), dim=1)).squeeze()
+        
+        # Convert dones to float and then to the same device as other tensors
+        dones_float = dones.float().to(z_values.device)
+        
+        target_z_values = rewards + gamma * next_z_values * (1 - dones_float)
+        
+        loss = torch.mean((z_values - target_z_values.detach())**2)
+        
+        z_opt.zero_grad()
+        loss.backward()
+        z_opt.step()
+
+        return loss.item()
+
     def compute_q_values(self, states):
         states_expanded = states.unsqueeze(1).repeat(1, self.action_dim, 1)
         actions = torch.eye(self.action_dim, device=self.device).unsqueeze(0).repeat(states.shape[0], 1, 1)
@@ -120,10 +155,10 @@ class ImitationLearning:
             raise ValueError("This method should not be called when memory replay is disabled.")
 
     def update_policy_with_replay(self, eta):
-        if len(self.replay_buffer) < self.batch_size:
+        if len(self.policy_replay_buffer) < self.batch_size:
             return 0, 0  # Not enough samples to update
 
-        states, actions, rewards, next_states, _ = self.replay_buffer.sample(self.batch_size)
+        states, actions, rewards, next_states, _ = self.policy_replay_buffer.sample(self.batch_size)
         
         return self._compute_policy_update(states, actions, eta)
 
@@ -153,6 +188,11 @@ class ImitationLearning:
 
         return loss.item(), kl_div.item()
 
-    def add_experience(self, state, action, reward, next_state, done):
+
+    def add_z_experience(self, state, action, reward, next_state, done, z_index):
         if self.use_memory_replay:
-            self.replay_buffer.push(state, action, reward, next_state, done)
+            self.z_replay_buffers[z_index].push(state, action, reward, next_state, done)
+
+    def add_policy_experience(self, state, action, reward, next_state, done):
+        if self.use_memory_replay:
+            self.policy_replay_buffer.push(state, action, reward, next_state, done)
