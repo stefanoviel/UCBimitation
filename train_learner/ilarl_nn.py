@@ -35,6 +35,8 @@ def parse_arguments():
                         help='size of the replay buffer')
     parser.add_argument('--batch-size', type=int, default=50, metavar='N',
                         help='batch size for policy updates')
+    parser.add_argument('--log-dir', type=str, default=None,
+                        help='directory for tensorboard logs')
     return parser.parse_args()
 
 def create_environment(args):
@@ -81,9 +83,10 @@ def compute_gradient_norm(model):
     total_norm = total_norm ** (1. / 2)
     return total_norm
 
-def setup_logging():
+def setup_logging(log_dir=None):
     current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
-    log_dir = os.path.join("runs_memory_replay", f"imitation_learning_{current_time}")
+    if log_dir is None:
+        log_dir = os.path.join("runs_memory_replay", f"imitation_learning_{current_time}")
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
 
@@ -167,8 +170,8 @@ def log_iteration_summary(k, data, policy_loss, reward_loss, q_values, estimated
 
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000, 
-                           use_memory_replay=False, buffer_size=2000, batch_size=100):
-    log_dir = setup_logging()
+                           use_memory_replay=False, buffer_size=2000, batch_size=100, log_dir=None):
+    log_dir = setup_logging(log_dir)
     writer = SummaryWriter(log_dir=log_dir)
 
     expert_states, expert_actions = load_and_preprocess_expert_data(expert_file, device)
@@ -258,7 +261,8 @@ if __name__ == "__main__":
         env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed,
         use_memory_replay=args.use_memory_replay,
         buffer_size=args.buffer_size,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        log_dir=args.log_dir
     )
 
     # open a csv common to all run and save true rewards together with the run parameters and date
