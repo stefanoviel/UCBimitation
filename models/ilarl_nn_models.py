@@ -120,12 +120,14 @@ class ImitationLearning:
         z_opt = self.z_optimizers[z_index]
         
         z_values = z_net(sa).squeeze()
+
+        # we need to compute the target with the z_net because we don't have the full trajectory
         next_z_values = z_net(torch.cat((next_states, actions_one_hot.float()), dim=1)).squeeze()
         
         # Convert dones to float and then to the same device as other tensors
         dones_float = dones.float().to(z_values.device)
         
-        target_z_values = rewards + gamma * next_z_values * (1 - dones_float)
+        target_z_values = rewards + gamma * next_z_values * (1 - dones_float) # no next_z for the last state
         
         loss = torch.mean((z_values - target_z_values.detach())**2)
         
@@ -176,7 +178,7 @@ class ImitationLearning:
         # Policy gradient loss
         pg_loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
 
-        # KL divergence loss to stay close to old policy
+        # KL divergence loss to stay close to old policy  [doesn't make a difference if we have the minus here or not]
         kl_div = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))
 
         # Combined loss

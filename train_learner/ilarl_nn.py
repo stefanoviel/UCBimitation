@@ -83,7 +83,7 @@ def compute_gradient_norm(model):
 
 def setup_logging():
     current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
-    log_dir = os.path.join("runs", f"imitation_learning_{current_time}")
+    log_dir = os.path.join("runs_memory_replay", f"imitation_learning_{current_time}")
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
 
@@ -167,7 +167,7 @@ def log_iteration_summary(k, data, policy_loss, reward_loss, q_values, estimated
 
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000, 
-                           use_memory_replay=False, buffer_size=2000, batch_size=50):
+                           use_memory_replay=False, buffer_size=2000, batch_size=100):
     log_dir = setup_logging()
     writer = SummaryWriter(log_dir=log_dir)
 
@@ -207,7 +207,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
                 iteration_data['policy_actions'], 
                 args.eta
             )
-
+            
         reward_loss = il_agent.update_reward(iteration_data['expert_traj_states'], iteration_data['expert_traj_actions'], 
                                              iteration_data['policy_states'], iteration_data['policy_actions'], args.eta)
 
