@@ -83,10 +83,13 @@ def compute_gradient_norm(model):
     total_norm = total_norm ** (1. / 2)
     return total_norm
 
-def setup_logging(log_dir=None):
+def setup_logging(log_dir=None, use_memory_replay=False):
     current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
+    memory_replay_str = "with_memory_replay" if use_memory_replay else "without_memory_replay"
     if log_dir is None:
-        log_dir = os.path.join("runs_memory_replay", f"imitation_learning_{current_time}")
+        log_dir = os.path.join("runs", f"imitation_learning_{memory_replay_str}_{current_time}")
+    else:
+        log_dir = os.path.join(log_dir, f"{memory_replay_str}_{current_time}")
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
 
@@ -181,8 +184,8 @@ def log_average_true_reward(writer, true_rewards, iteration):
     writer.add_scalar('Reward/Average True Reward', avg_true_reward, iteration)
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000, 
-                           use_memory_replay=False, buffer_size=2000, batch_size=100, log_dir=None):
-    log_dir = setup_logging(log_dir)
+                           use_memory_replay=False, buffer_size=5000, batch_size=500, log_dir=None):
+    log_dir = setup_logging(log_dir, use_memory_replay)
     writer = SummaryWriter(log_dir=log_dir)
 
     expert_states, expert_actions = load_and_preprocess_expert_data(expert_file, device)
