@@ -168,6 +168,17 @@ def log_iteration_summary(k, data, policy_loss, reward_loss, q_values, estimated
           f"True Mean Episodic Return = {data['true_policy_rewards'].mean().item():.4f}, "
           f"Loop Duration = {duration:.4f} seconds")
 
+def log_average_true_reward(writer, true_rewards, iteration):
+    """
+    Log the average true reward to TensorBoard.
+    
+    Args:
+    writer (SummaryWriter): TensorBoard writer object
+    true_rewards (list): List of true rewards
+    iteration (int): Current iteration number
+    """
+    avg_true_reward = sum(true_rewards) / len(true_rewards)
+    writer.add_scalar('Reward/Average True Reward', avg_true_reward, iteration)
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000, 
                            use_memory_replay=False, buffer_size=2000, batch_size=100, log_dir=None):
@@ -189,6 +200,9 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
 
         iteration_data = collect_iteration_data(env, il_agent, expert_states, expert_actions, device, max_steps)
         all_true_rewards.append(iteration_data['true_policy_rewards'].mean().item())
+
+        # Log average true reward
+        log_average_true_reward(writer, all_true_rewards, k)
 
         if use_memory_replay:
             # Add experiences to policy replay buffer
@@ -218,12 +232,13 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         for z_index in range(num_of_NNs):
             if use_memory_replay:
                 # Collect new experiences for z network
-                z_states, z_actions, z_rewards = collect_trajectory(env, il_agent, device)
+                z_states, z_actions, _ = collect_trajectory(env, il_agent, device)
+                estimated_z_rewards = il_agent.reward(torch.cat((z_states, torch.nn.functional.one_hot(z_actions, num_classes=action_dim).float()), dim=1))
                 for i in range(len(z_states)):
                     il_agent.add_z_experience(
                         z_states[i],
                         z_actions[i],
-                        z_rewards[i],
+                        estimated_z_rewards[i].item(),
                         z_states[i+1] if i+1 < len(z_states) else None,
                         i+1 == len(z_states),
                         z_index
