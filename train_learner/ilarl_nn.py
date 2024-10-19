@@ -38,7 +38,7 @@ def parse_arguments():
                         help='size of the replay buffer')
     parser.add_argument('--batch-size', type=int, default=2e4, metavar='N',
                         help='batch size for policy updates')
-    parser.add_argument('--log-dir', type=str, default=None,
+    parser.add_argument('--log-dir', type=str, default='runs',
                         help='directory for tensorboard logs')
     return parser.parse_args()
 
@@ -255,6 +255,8 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         reward_loss = il_agent.update_reward(iteration_data['expert_traj_states'], iteration_data['expert_traj_actions'], 
                                              iteration_data['policy_states'], iteration_data['policy_actions'], args.eta)
         z_loss = update_z_networks(il_agent, iteration_data, args, writer, k, num_of_NNs, action_dim)
+        z_variance = il_agent.compute_z_variance()
+        writer.add_scalar('Metrics/Z Variance', z_variance, k)
 
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
 
