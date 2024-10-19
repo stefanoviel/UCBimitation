@@ -289,7 +289,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     env = create_environment(args)
     
-    device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     il_agent, all_true_rewards = run_imitation_learning(
