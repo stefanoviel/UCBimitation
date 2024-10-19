@@ -50,6 +50,12 @@ class ImitationLearning:
     def select_action(self, state):
         with torch.no_grad():
             logits = self.policy(state)
+
+            # TODO: why doesn't it work with 1 NN?
+            if torch.isnan(logits).any() or torch.isinf(logits).any():
+                print("state", state)   
+                print("logits", logits)
+                print("Warning: NaN or Inf detected in logits!")
             action_probs = torch.softmax(logits, dim=-1)
             action = torch.multinomial(action_probs, 1)
         return action
@@ -148,6 +154,7 @@ class ImitationLearning:
 
         rewards = self.reward(state_action_pairs)
         
+        # add un parametro per scegliere quanta incertezza aggiungere 
         return rewards + z_avg + z_std
     
     def update_policy(self, eta):
@@ -186,7 +193,7 @@ class ImitationLearning:
 
         self.policy_optimizer.zero_grad()
         loss.backward()
-        self.policy_optimizer.step()
+        self.policy_optimizer.step() # TODO: try to do more steps
 
         return loss.item(), kl_div.item()
 

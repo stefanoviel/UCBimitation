@@ -31,9 +31,9 @@ def parse_arguments():
     parser.add_argument('--gamma', type=float, default=0.99, metavar='G')
     parser.add_argument('--use-memory-replay', action='store_true',
                         help='use memory replay for policy updates')
-    parser.add_argument('--buffer-size', type=int, default=2000, metavar='N',
+    parser.add_argument('--buffer-size', type=int, default=2e5, metavar='N',
                         help='size of the replay buffer')
-    parser.add_argument('--batch-size', type=int, default=50, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=2e4, metavar='N',
                         help='batch size for policy updates')
     parser.add_argument('--log-dir', type=str, default=None,
                         help='directory for tensorboard logs')
@@ -184,7 +184,7 @@ def log_average_true_reward(writer, true_rewards, iteration):
     writer.add_scalar('Reward/Average True Reward', avg_true_reward, iteration)
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000, 
-                           use_memory_replay=False, buffer_size=5000, batch_size=500, log_dir=None):
+                           use_memory_replay=False, buffer_size=None, batch_size=None, log_dir=None):
     log_dir = setup_logging(log_dir, use_memory_replay)
     writer = SummaryWriter(log_dir=log_dir)
 
@@ -202,6 +202,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         start_time = time.time()
 
         iteration_data = collect_iteration_data(env, il_agent, expert_states, expert_actions, device, max_steps)
+
         all_true_rewards.append(iteration_data['true_policy_rewards'].mean().item())
 
         # Log average true reward
@@ -278,13 +279,14 @@ if __name__ == "__main__":
     il_agent, all_true_rewards = run_imitation_learning(
         env, args.expert_trajs, args.max_iter_num, args.num_of_NNs, device, args.seed,
         use_memory_replay=args.use_memory_replay,
-        buffer_size=args.buffer_size,
-        batch_size=args.batch_size,
+        buffer_size=int(args.buffer_size),
+        batch_size=int(args.batch_size),
         log_dir=args.log_dir
     )
 
     # open a csv common to all run and save true rewards together with the run parameters and date
-    with open("runs/true_rewards.csv", "a") as file:
+    log_file_path = os.path.join(args.log_dir, "true_rewards.csv") if args.log_dir else "runs/true_rewards.csv"
+    with open(log_file_path, "a") as file:
         if file.tell() == 0:  # Check if the file is empty to write the header
             file.write("timestamp,env_name,noiseE,grid_type,expert_trajs,max_iter_num,num_of_NNs,seed,eta,gamma,true_rewards\n")
         file.write(f"{datetime.now()},{args.env_name},{args.noiseE},{args.grid_type},{args.expert_trajs},{args.max_iter_num},{args.num_of_NNs},{args.seed},{args.eta},{args.gamma},{np.mean(all_true_rewards)}\n")
