@@ -267,35 +267,45 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         start_time = time.time()
 
         iteration_data = collect_iteration_data(env, il_agent, expert_states, expert_actions, device, max_steps)
-
         all_true_rewards.append(iteration_data['true_policy_rewards'].mean().item())
-
-        # Log average true reward
         log_average_true_reward(writer, all_true_rewards, k)
 
         # update policy here
         policy_loss, kl_div = update_policy(il_agent, iteration_data, args)
-            
         reward_loss = il_agent.update_reward(iteration_data['expert_traj_states'], iteration_data['expert_traj_actions'], 
                                              iteration_data['policy_states'], iteration_data['policy_actions'], args.eta)
-
-
         z_loss = update_z_networks(il_agent, iteration_data, args, writer, k, num_of_NNs, action_dim)
 
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
-        
         log_action_distribution(il_agent, iteration_data['policy_states'], writer, k)
-        
         log_z_values(il_agent, iteration_data, writer, k, action_dim)
-        
         log_gradient_norms(il_agent, writer, k)
-
         log_state_visitation_distance(iteration_data, writer, k)
 
         end_time = time.time()
         log_iteration_summary(k, iteration_data, policy_loss, reward_loss, q_values, estimated_policy_reward, end_time - start_time)
 
     return il_agent, all_true_rewards
+
+def prepare_csv_data(args, all_true_rewards):
+    run_id = datetime.now().strftime('%Y%m%d-%H%M%S')
+    data_to_write = []
+    for i in range(args.max_iter_num):
+        row = {
+            'iteration': i,
+            'true_reward': all_true_rewards[i],
+            'run_id': run_id
+        }
+        row.update({arg: str(value) for arg, value in vars(args).items()})
+        data_to_write.append(row)
+    return data_to_write, list(data_to_write[0].keys())
+
+def save_results(args, all_true_rewards):
+    data_to_write, fieldnames = prepare_csv_data(args, all_true_rewards)
+    log_file_path = os.path.join(args.log_dir, "true_rewards.csv") if args.log_dir else "runs/true_rewards.csv"
+    safe_write_csv(log_file_path, data_to_write, fieldnames)
+    print(f"True rewards and run parameters saved to {log_file_path}")
+
 
 if __name__ == "__main__":
     args = parse_arguments()
@@ -312,41 +322,4 @@ if __name__ == "__main__":
         log_dir=args.log_dir
     )
 
-    # Create a unique identifier for this run
-    run_id = datetime.now().strftime('%Y%m%d-%H%M%S')
-
-    # Prepare the data for CSV
-    data = {
-        'iteration': list(range(args.max_iter_num)),
-        'true_reward': all_true_rewards,
-        'run_id': [run_id] * args.max_iter_num
-    }
-
-    # Add all command-line arguments
-    for arg, value in vars(args).items():
-        data[arg] = [str(value)] * args.max_iter_num
-
-    # Convert to DataFrame
-    df = pd.DataFrame(data)
-
-    # Save to CSV
-    log_file_path = os.path.join(args.log_dir, "true_rewards.csv") if args.log_dir else "runs/true_rewards.csv"
-    
-    # Prepare the data as a list of dictionaries
-    data_to_write = []
-    for i in range(args.max_iter_num):
-        row = {
-            'iteration': i,
-            'true_reward': all_true_rewards[i],
-            'run_id': run_id
-        }
-        row.update({arg: str(value) for arg, value in vars(args).items()})
-        data_to_write.append(row)
-
-    # Get fieldnames from the first row
-    fieldnames = list(data_to_write[0].keys())
-
-    # Safely write to CSV
-    safe_write_csv(log_file_path, data_to_write, fieldnames)
-
-    print(f"True rewards and run parameters saved to {log_file_path}")
+    save_results(args, all_true_rewards)
