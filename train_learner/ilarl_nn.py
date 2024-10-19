@@ -146,29 +146,6 @@ def log_rewards_and_q_values(il_agent, data, writer, k, action_dim):
 
     return q_values, estimated_policy_reward
 
-def log_action_distribution(il_agent, policy_states, writer, k):
-    action_probs = torch.softmax(il_agent.policy(policy_states), dim=-1)
-    writer.add_histogram('Action Distribution', action_probs, k)
-
-def log_z_values(il_agent, data, writer, k, action_dim):
-    z_values = torch.stack([z_net(torch.cat((data['policy_states'], 
-                torch.nn.functional.one_hot(data['policy_actions'], num_classes=action_dim).float()), dim=1)) 
-                for z_net in il_agent.z_networks])        
-    writer.add_scalar('Metrics/Z Mean', z_values.mean().item(), k)
-    writer.add_scalar('Metrics/Z Std', z_values.std().item(), k)
-
-def log_gradient_norms(il_agent, writer, k):
-    policy_grad_norm = compute_gradient_norm(il_agent.policy)
-    reward_grad_norm = compute_gradient_norm(il_agent.reward)
-    writer.add_scalar('Gradients/Policy Gradient Norm', policy_grad_norm, k)
-    writer.add_scalar('Gradients/Reward Gradient Norm', reward_grad_norm, k)
-
-def log_state_visitation_distance(data, writer, k):
-    expert_state_mean = data['expert_traj_states'].mean(dim=0)
-    policy_state_mean = data['policy_states'].mean(dim=0)
-    state_distance = torch.norm(expert_state_mean - policy_state_mean).item()
-    writer.add_scalar('Metrics/State Visitation Distance', state_distance, k)
-
 def log_iteration_summary(k, data, policy_loss, reward_loss, q_values, estimated_policy_reward, duration):
     print(f"Iteration {k}: "
           f"Reward Loss = {reward_loss:.4f}, "
@@ -274,17 +251,12 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
         all_true_rewards.append(iteration_data['true_policy_rewards'].mean().item())
         log_average_true_reward(writer, all_true_rewards, k)
 
-        # update policy here
         policy_loss, kl_div = update_policy(il_agent, iteration_data, args)
         reward_loss = il_agent.update_reward(iteration_data['expert_traj_states'], iteration_data['expert_traj_actions'], 
                                              iteration_data['policy_states'], iteration_data['policy_actions'], args.eta)
         z_loss = update_z_networks(il_agent, iteration_data, args, writer, k, num_of_NNs, action_dim)
 
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
-        log_action_distribution(il_agent, iteration_data['policy_states'], writer, k)
-        log_z_values(il_agent, iteration_data, writer, k, action_dim)
-        log_gradient_norms(il_agent, writer, k)
-        log_state_visitation_distance(iteration_data, writer, k)
 
         end_time = time.time()
         log_iteration_summary(k, iteration_data, policy_loss, reward_loss, q_values, estimated_policy_reward, end_time - start_time)
