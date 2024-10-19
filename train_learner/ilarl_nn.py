@@ -86,13 +86,17 @@ def compute_gradient_norm(model):
     total_norm = total_norm ** (1. / 2)
     return total_norm
 
-def setup_logging(log_dir=None, use_memory_replay=False):
+def setup_logging(log_dir=None, use_memory_replay=False, seed=None, num_of_NNs=None):
     current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
     memory_replay_str = "with_memory_replay" if use_memory_replay else "without_memory_replay"
+    seed_str = f"seed{seed}" if seed is not None else ""
+    nn_str = f"nn{num_of_NNs}" if num_of_NNs is not None else ""
+    
     if log_dir is None:
-        log_dir = os.path.join("runs", f"imitation_learning_{memory_replay_str}_{current_time}")
+        log_dir = os.path.join("runs", f"imitation_learning_{memory_replay_str}_{seed_str}_{nn_str}_{current_time}")
     else:
-        log_dir = os.path.join(log_dir, f"{memory_replay_str}_{current_time}")
+        log_dir = os.path.join(log_dir, f"{memory_replay_str}_{seed_str}_{nn_str}_{current_time}")
+    
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
 
@@ -250,7 +254,7 @@ def update_z_networks(il_agent, data, args, writer, k, num_of_NNs, action_dim):
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000, 
                            use_memory_replay=False, buffer_size=None, batch_size=None, log_dir=None):
-    log_dir = setup_logging(log_dir, use_memory_replay)
+    log_dir = setup_logging(log_dir, use_memory_replay, seed, num_of_NNs)
     writer = SummaryWriter(log_dir=log_dir)
 
     expert_states, expert_actions = load_and_preprocess_expert_data(expert_file, device)
