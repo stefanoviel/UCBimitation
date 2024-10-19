@@ -157,7 +157,7 @@ def log_iteration_summary(k, data, policy_loss, reward_loss, q_values, estimated
 
 def log_average_true_reward(writer, true_rewards, iteration):
 
-    writer.add_scalar('Reward/True Reward', true_rewards, iteration)
+    writer.add_scalar('Reward/True Reward', true_rewards[-1], iteration)
 
 def safe_write_csv(file_path, data, fieldnames):
     file_exists = os.path.exists(file_path)
