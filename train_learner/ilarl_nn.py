@@ -14,6 +14,9 @@ from collections import defaultdict
 from models.ilarl_nn_models import TwoLayerNet, ImitationLearning
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter  # Import TensorBoard
+import pandas as pd
+import csv
+import fcntl  # For Unix-based systems
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='UCB')
@@ -183,6 +186,19 @@ def log_average_true_reward(writer, true_rewards, iteration):
     avg_true_reward = sum(true_rewards) / len(true_rewards)
     writer.add_scalar('Reward/Average True Reward', avg_true_reward, iteration)
 
+def safe_write_csv(file_path, data, fieldnames):
+    file_exists = os.path.exists(file_path)
+    
+    with open(file_path, 'a' if file_exists else 'w', newline='') as f:
+        fcntl.flock(f, fcntl.LOCK_EX)  # Acquire an exclusive lock
+        try:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerows(data)
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)  # Release the lock
+
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, seed=None, max_steps=10000, 
                            use_memory_replay=False, buffer_size=None, batch_size=None, log_dir=None):
     log_dir = setup_logging(log_dir, use_memory_replay)
@@ -284,9 +300,41 @@ if __name__ == "__main__":
         log_dir=args.log_dir
     )
 
-    # open a csv common to all run and save true rewards together with the run parameters and date
+    # Create a unique identifier for this run
+    run_id = datetime.now().strftime('%Y%m%d-%H%M%S')
+
+    # Prepare the data for CSV
+    data = {
+        'iteration': list(range(args.max_iter_num)),
+        'true_reward': all_true_rewards,
+        'run_id': [run_id] * args.max_iter_num
+    }
+
+    # Add all command-line arguments
+    for arg, value in vars(args).items():
+        data[arg] = [str(value)] * args.max_iter_num
+
+    # Convert to DataFrame
+    df = pd.DataFrame(data)
+
+    # Save to CSV
     log_file_path = os.path.join(args.log_dir, "true_rewards.csv") if args.log_dir else "runs/true_rewards.csv"
-    with open(log_file_path, "a") as file:
-        if file.tell() == 0:  # Check if the file is empty to write the header
-            file.write("timestamp,env_name,noiseE,grid_type,expert_trajs,max_iter_num,num_of_NNs,seed,eta,gamma,true_rewards\n")
-        file.write(f"{datetime.now()},{args.env_name},{args.noiseE},{args.grid_type},{args.expert_trajs},{args.max_iter_num},{args.num_of_NNs},{args.seed},{args.eta},{args.gamma},{np.mean(all_true_rewards)}\n")
+    
+    # Prepare the data as a list of dictionaries
+    data_to_write = []
+    for i in range(args.max_iter_num):
+        row = {
+            'iteration': i,
+            'true_reward': all_true_rewards[i],
+            'run_id': run_id
+        }
+        row.update({arg: str(value) for arg, value in vars(args).items()})
+        data_to_write.append(row)
+
+    # Get fieldnames from the first row
+    fieldnames = list(data_to_write[0].keys())
+
+    # Safely write to CSV
+    safe_write_csv(log_file_path, data_to_write, fieldnames)
+
+    print(f"True rewards and run parameters saved to {log_file_path}")
