@@ -70,13 +70,6 @@ class ImitationLearning:
         expert_reward = self.reward(expert_sa).mean()
         policy_reward = self.reward(policy_sa).mean()
 
-        # TODO: check if this is correct
-        # we want to increase the expert reward, because we know the expert played well
-        # we want to bring the policy reward closer to the expert reward
-        # what stops me from increasing the expert reward and decresing the policy reward indefinitely? 
-            # the fact that the policy is trained to maximize the reward. So if the reward is high for the expert, the policy will try to get the same reward
-            # the policy reward is here just for reference
-
         loss = policy_reward - expert_reward
         self.reward_optimizer.zero_grad()
         loss.backward()
