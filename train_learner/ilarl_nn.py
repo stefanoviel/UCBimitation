@@ -156,16 +156,8 @@ def log_iteration_summary(k, data, policy_loss, reward_loss, q_values, estimated
           f"Loop Duration = {duration:.4f} seconds")
 
 def log_average_true_reward(writer, true_rewards, iteration):
-    """
-    Log the average true reward to TensorBoard.
-    
-    Args:
-    writer (SummaryWriter): TensorBoard writer object
-    true_rewards (list): List of true rewards
-    iteration (int): Current iteration number
-    """
-    avg_true_reward = sum(true_rewards) / len(true_rewards)
-    writer.add_scalar('Reward/Average True Reward', avg_true_reward, iteration)
+
+    writer.add_scalar('Reward/True Reward', true_rewards, iteration)
 
 def safe_write_csv(file_path, data, fieldnames):
     file_exists = os.path.exists(file_path)
