@@ -12,6 +12,7 @@ def collect_trajectory(env, agent, device, max_steps=10000):
     states, actions, rewards = [], [], []
     state, _ = env.reset()
     state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+    
     for iterations in range(max_steps):
         action = agent.select_action(state_tensor)
         next_state, reward, done, _ = env.step(action.item())

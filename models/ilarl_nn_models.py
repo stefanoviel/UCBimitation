@@ -62,9 +62,10 @@ class ImitationLearning:
 
             # TODO: why doesn't it work with 1 NN?
             if torch.isnan(logits).any() or torch.isinf(logits).any():
-                print("state", state)   
+                print("state", state)
                 print("logits", logits)
                 print("Warning: NaN or Inf detected in logits!")
+                
             action_probs = torch.softmax(logits, dim=-1)
             action = torch.multinomial(action_probs, 1)
         return action
@@ -158,7 +159,10 @@ class ImitationLearning:
 
         z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_networks])
         z_avg = torch.mean(z_values, dim=0)
-        z_std = torch.std(z_values, dim=0)
+        if len(self.z_networks) > 1:
+            z_std = torch.std(z_values, dim=0)
+        else:
+            z_std = torch.zeros_like(z_avg)
 
         rewards = self.reward(state_action_pairs)
         

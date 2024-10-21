@@ -1,5 +1,3 @@
 iteration,true_reward,run_id,env_name,noiseE,grid_type,expert_trajs,max_iter_num,num_of_NNs,seed,eta,gamma,use_memory_replay,buffer_size,batch_size,log_dir
-0,-4.33348876022527,20241021-125410,DiscreteGaussianGridworld-v0,0.0,1,assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl,2,2,22,10,0.99,True,200000.0,20000.0,runs_memory_replay
-1,-4.375333858408267,20241021-125410,DiscreteGaussianGridworld-v0,0.0,1,assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl,2,2,22,10,0.99,True,200000.0,20000.0,runs_memory_replay
-0,-4.33348876022527,20241021-125433,DiscreteGaussianGridworld-v0,0.0,1,assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl,2,2,22,10,0.99,True,200000.0,20000.0,runs_memory_replay
-1,-4.375333858408267,20241021-125433,DiscreteGaussianGridworld-v0,0.0,1,assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl,2,2,22,10,0.99,True,200000.0,20000.0,runs_memory_replay
+0,-4.224133044078907,20241021-125937,DiscreteGaussianGridworld-v0,0.0,1,assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl,2,5,22,10,0.99,True,200000.0,20000.0,runs_memory_replay
+1,-4.5856727335541345,20241021-125937,DiscreteGaussianGridworld-v0,0.0,1,assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl,2,5,22,10,0.99,True,200000.0,20000.0,runs_memory_replay
