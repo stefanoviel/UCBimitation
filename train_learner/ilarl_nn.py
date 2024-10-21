@@ -230,9 +230,8 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, s
     
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
-    
-    il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, device=device, seed=seed, 
-                                 use_memory_replay=use_memory_replay, buffer_size=buffer_size, batch_size=batch_size)
+
+    il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, buffer_size, batch_size, device=device, seed=seed, use_memory_replay=use_memory_replay, )
 
     all_true_rewards = []
     
