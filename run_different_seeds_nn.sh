@@ -2,7 +2,7 @@
 
 # Define the parameters
 seeds=(3 22 42 64 99 123 456 789 999 1024)  # List of different seeds
-num_of_NNs=(2 5 10)          # List of different --num-of-NNs values
+num_of_NNs=(1 2 3 5 10)          # List of different --num-of-NNs values
 
 # Function to generate and run the command
 run_command() {
@@ -10,7 +10,7 @@ run_command() {
     nn=$2
     command="python -m ilarl_nn.main --env-name DiscreteGaussianGridworld-v0 \
       --expert-trajs assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl \
-      --max-iter-num 100 --grid-type 1 --noiseE 0.0 --seed $seed --num-of-NNs $nn --log-dir runs_memory_replay --memory_replay"
+      --max-iter-num 100 --grid-type 1 --noiseE 0.0 --seed $seed --num-of-NNs $nn --log-dir runs_memory_replay --use-memory-replay"
     
     echo "Running: $command"
     eval $command
