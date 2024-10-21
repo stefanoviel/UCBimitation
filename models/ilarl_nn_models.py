@@ -22,11 +22,12 @@ class TwoLayerNet(torch.nn.Module):
 
 class ImitationLearning:
     def __init__(self, state_dim, action_dim, num_of_NNs, buffer_size, batch_size, learning_rate=1e-3, device='cpu', seed=None, 
-                 use_memory_replay=False):
+                 use_memory_replay=False, z_std_multiplier=1.0):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_of_NNs = num_of_NNs
         self.device = device
+        self.z_std_multiplier = z_std_multiplier  # Add this line
 
         if seed is not None:
             torch.manual_seed(seed)
@@ -166,8 +167,7 @@ class ImitationLearning:
 
         rewards = self.reward(state_action_pairs)
         
-        # add un parametro per scegliere quanta incertezza aggiungere 
-        return rewards + z_avg + z_std
+        return rewards + z_avg + self.z_std_multiplier * z_std
     
     def update_policy(self, eta):
         if self.use_memory_replay:
@@ -227,3 +227,4 @@ class ImitationLearning:
             # Average variance across all state-action pairs
             avg_z_variance = z_variance_per_sa.mean().item()
         return avg_z_variance
+
