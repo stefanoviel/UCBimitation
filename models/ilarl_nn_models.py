@@ -70,6 +70,12 @@ class ImitationLearning:
         return action
 
     def update_reward(self, expert_states, expert_actions, policy_states, policy_actions, eta):
+        # Remove the last state and action if they don't match
+        if expert_states.shape[0] != expert_actions.shape[0]:
+            expert_states = expert_states[:-1]
+        if policy_states.shape[0] != policy_actions.shape[0]:
+            policy_states = policy_states[:-1]
+
         expert_actions_one_hot = torch.nn.functional.one_hot(expert_actions, num_classes=self.action_dim)
         policy_actions_one_hot = torch.nn.functional.one_hot(policy_actions, num_classes=self.action_dim)
     
