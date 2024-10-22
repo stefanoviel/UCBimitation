@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-main_folder = 'runs_memory_replay_zmul'
+main_folder = 'runs_memory_replay'
 os.makedirs(f'figs/{main_folder}', exist_ok=True)
 
 # Read the CSV file
 df = pd.read_csv(main_folder + '/true_rewards.csv')
 
 # Group by num_of_NNs and run_id, then find the max true_reward for each group
-max_rewards = df.groupby(['num_of_NNs', 'run_id'])['true_reward'].max().reset_index()
+max_rewards = df.groupby(['num_of_NNs', 'seed'])['true_reward'].max().reset_index()
 
 # Calculate the average and standard deviation of max true_rewards for each num_of_NNs
 avg_max_rewards = max_rewards.groupby('num_of_NNs')['true_reward'].agg(['mean', 'std']).reset_index()
@@ -46,7 +46,7 @@ plt.savefig(f'figs/{main_folder}/avg_max_true_reward_vs_num_of_NNs.png')
 df = pd.read_csv(main_folder + '/true_rewards.csv')
 
 # Calculate the mean reward for each run
-mean_rewards = df.groupby(['num_of_NNs', 'run_id'])['true_reward'].mean().reset_index()
+mean_rewards = df.groupby(['num_of_NNs', 'seed'])['true_reward'].mean().reset_index()
 
 # Calculate the average and standard deviation of mean rewards for each num_of_NNs
 avg_mean_rewards = mean_rewards.groupby('num_of_NNs')['true_reward'].agg(['mean', 'std']).reset_index()
