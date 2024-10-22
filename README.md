@@ -10,48 +10,8 @@ Authors' implementation for the experiment in the ICML 2024 paper: **Imitation L
 
 Link: https://arxiv.org/abs/2405.02181
 
-To reproduce the results use the following commands:
+To reproduce the results use the following commands (where num-of-NNs is the number of neural networks).
 
-"""
-python -m train_expert.infinite_imitation --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs16.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --beta 8 --noiseE 0.0
-"""
-
-"""
-python -m train_expert.infinite_imitation --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs6.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --beta 8 --noiseE 0.05
-"""
-
-
-"""
-python -m train_expert.infinite_imitation --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs30.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --beta 8 --noiseE 0.1
-"""
-
-To reproduce proximal point use
-
-"""
-python train_learner/ppil.py --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs16.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --eta 1 --noiseE 0.0
-"""
-
-To use GAIL
-
-"""
-python train_learner/gail.py --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs16.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --noiseE 0.0
-"""
-
-For AIRL
-
-"""
-python train_learner/gail.py --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs16.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --noiseE 0.0 --reward-type airl
-"""
-
-For REIRL
-
-"""
-python train_learner/reirl.py --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs16.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --noiseE 0.0
-"""
-
-For IQLearn
-
-"""
- python train_learner/iqlearn.py --env-name DiscreteGaussianGridworld-v0  --expert-trajs trajs16.pkl --num-threads 1 --max-iter-num 200 --save-model-interval 10 --grid-type 1 --eta 1 --noiseE 0.0
-"""
-
+python -m ilarl_nn.main --env-name DiscreteGaussianGridworld-v0 \
+      --expert-trajs assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl \
+      --max-iter-num 100 --grid-type 1 --noiseE 0.0 --seed $seed --num-of-NNs $nn --log-dir runs_memory_replay_zmul --use-memory-replay --z-std-multiplier 10.0
