@@ -2,7 +2,7 @@ from ilarl_nn.logging import setup_logging, log_rewards_and_q_values, log_iterat
 from ilarl_nn.data_handling import load_and_preprocess_expert_data
 from ilarl_nn.environment import collect_trajectory
 from ilarl_nn.utils import prepare_csv_data, safe_write_csv
-from models.ilarl_nn_models import TwoLayerNet, ImitationLearning
+from ilarl_nn.ilarl_nn_models import TwoLayerNet, ImitationLearning
 from torch.utils.tensorboard import SummaryWriter  # Import TensorBoard
 import torch
 import time
