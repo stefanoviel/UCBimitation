@@ -3,6 +3,7 @@ assets
 imit_ucb/* 
 assets/*
 runs/*
-run_memory_replay/*
+runs_memory_replay/*
 runs_no_memory_replay/*
+runs_memory_replay_zmul/*
 *.pyc
