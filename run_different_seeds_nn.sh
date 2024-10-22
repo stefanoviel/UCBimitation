@@ -10,7 +10,7 @@ run_command() {
     nn=$2
     command="python -m ilarl_nn.main --env-name DiscreteGaussianGridworld-v0 \
       --expert-trajs assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl \
-      --max-iter-num 100 --grid-type 1 --noiseE 0.0 --seed $seed --num-of-NNs $nn --log-dir runs_memory_replay --use-memory-replay --z-std-multiplier 10.0"
+      --max-iter-num 100 --grid-type 1 --noiseE 0.0 --seed $seed --num-of-NNs $nn --log-dir runs_memory_replay_zmul --use-memory-replay --z-std-multiplier 10.0"
     
     echo "Running: $command"
     eval $command
