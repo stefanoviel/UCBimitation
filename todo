@@ -1,15 +1,4 @@
-plot with different number of NNs and see how performance change. Not really, maybe more NNs? probably a problem with stability
-    maybe use the mean Q value over the episode
-implement experience replay both for policy and Z NNs for increased stability. Learning happens on a random sample
-
-
-
-keep update in memory (different dataset between different NN) to increase stability. Make it optional (on policy - off policy). does it improve? 
 
 
 questions: 
-why if I put a minus in front the policy loss goes up and Q values go down, but it still work??? 
-    For some reasons it got solved by always using the estimated reward
-why changing eta only changes the value of the loss but doesn't increase or dicrease the exploration rate??
-Why does it run faster on my mac compared to cluster? I think because there isn't a lot of stuff to paralelize
-
+    why in the definition we say that z estimates V(s, a) isn't the value function supposed to be for the states? 

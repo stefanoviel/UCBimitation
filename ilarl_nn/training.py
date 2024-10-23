@@ -56,7 +56,7 @@ def update_z_networks(il_agent,args,num_of_NNs, action_dim, env, device):
     return z_loss
 
 
-def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, args, z_std_multiplier, seed=None, max_steps=10000, use_memory_replay=False, buffer_size=None, batch_size=None, log_dir=None):
+def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, args, z_std_multiplier, seed=None, max_steps=10000, use_memory_replay=False, buffer_size=None, batch_size=None, log_dir=None, recompute_rewards=False):
     writer = setup_logging(log_dir, use_memory_replay, seed, num_of_NNs)
 
     expert_states, expert_actions = load_and_preprocess_expert_data(expert_file, device)
@@ -65,7 +65,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
     action_dim = env.action_space.n
     
     il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, buffer_size, batch_size, device=device, seed=seed, 
-                                 use_memory_replay=use_memory_replay, z_std_multiplier=z_std_multiplier)
+                                 use_memory_replay=use_memory_replay, z_std_multiplier=z_std_multiplier, recompute_rewards=recompute_rewards)
 
     all_true_rewards = []
     

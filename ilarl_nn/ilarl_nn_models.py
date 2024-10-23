@@ -22,12 +22,13 @@ class TwoLayerNet(torch.nn.Module):
 
 class ImitationLearning:
     def __init__(self, state_dim, action_dim, num_of_NNs, buffer_size, batch_size, learning_rate=1e-3, device='cpu', seed=None, 
-                 use_memory_replay=False, z_std_multiplier=1.0):
+                 use_memory_replay=False, z_std_multiplier=1.0, recompute_rewards=False):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_of_NNs = num_of_NNs
         self.device = device
-        self.z_std_multiplier = z_std_multiplier  # Add this line
+        self.z_std_multiplier = z_std_multiplier
+        self.recompute_rewards = recompute_rewards
 
         if seed is not None:
             torch.manual_seed(seed)
@@ -127,7 +128,7 @@ class ImitationLearning:
         if len(self.z_replay_buffers[z_index]) < self.batch_size:
             return 0  # Not enough samples to update
 
-        states, actions, rewards, next_states, dones = self.z_replay_buffers[z_index].sample(self.batch_size)
+        states, actions, stored_rewards, next_states, dones = self.z_replay_buffers[z_index].sample(self.batch_size)
         
         actions_one_hot = torch.nn.functional.one_hot(actions, num_classes=self.action_dim)
         sa = torch.cat((states, actions_one_hot.float()), dim=1)
@@ -137,13 +138,20 @@ class ImitationLearning:
         
         z_values = z_net(sa).squeeze()
 
-        # we need to compute the target with the z_net because we don't have the full trajectory
-        next_z_values = z_net(torch.cat((next_states, actions_one_hot.float()), dim=1)).squeeze()
+        # Compute next state-action pairs for z_net
+        next_sa = torch.cat((next_states, actions_one_hot.float()), dim=1)
+        next_z_values = z_net(next_sa).squeeze()
         
         # Convert dones to float and then to the same device as other tensors
         dones_float = dones.float().to(z_values.device)
         
-        target_z_values = rewards + gamma * next_z_values * (1 - dones_float) # no next_z for the last state
+        if self.recompute_rewards:
+            # Recompute rewards using the current reward network
+            rewards = self.reward(sa).squeeze()
+        else:
+            rewards = stored_rewards
+
+        target_z_values = rewards + gamma * next_z_values * (1 - dones_float) # only consider the reward if terminal state
         
         loss = torch.mean((z_values - target_z_values.detach())**2)
         
@@ -227,4 +235,5 @@ class ImitationLearning:
             # Average variance across all state-action pairs
             avg_z_variance = z_variance_per_sa.mean().item()
         return avg_z_variance
+
 
