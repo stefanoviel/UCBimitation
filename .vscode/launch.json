@@ -5,24 +5,17 @@
       "name": "Run train_learner.ilarl_nn",
       "type": "debugpy",
       "request": "launch",
-      "module": "train_learner.ilarl_nn",
+      "module": "ilarl_nn.main",
       "args": [
         "--env-name", "DiscreteGaussianGridworld-v0",
         "--expert-trajs", "assets/envDiscreteGaussianGridworld-v0type1noiseE0.0/expert_trajs/trajs16.pkl",
+        "--num-of-NNs", "1",
         "--max-iter-num", "100",
         "--grid-type", "1",
         "--noiseE", "0.0",
         "--seed", "1"
       ],
       "console": "integratedTerminal",
-      "python": "/home/viel/.pyenv/shims/python",
-      "env": {
-        "PYENV_VERSION": ".myenv"
-      },
-      "cwd": "${workspaceFolder}",
-      "shell": {
-        "executable": "/bin/bash"
-      }
     }
   ]
 }
