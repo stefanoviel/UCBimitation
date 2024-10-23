@@ -28,6 +28,8 @@ def parse_arguments():
                         help='directory for tensorboard logs')
     parser.add_argument('--z-std-multiplier', type=float, default=1.0, metavar='G',
                         help='multiplier for the standard deviation of the z-values')
+    parser.add_argument('--recompute_rewards', action='store_true', help='Recompute rewards using the reward network instead of using stored rewards')
+    
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -43,8 +45,8 @@ if __name__ == "__main__":
         use_memory_replay=args.use_memory_replay,
         buffer_size=int(args.buffer_size),
         batch_size=int(args.batch_size),
-        log_dir=args.log_dir
+        log_dir=args.log_dir,
+        recompute_rewards=args.recompute_rewards
     )
 
     save_results(args, all_true_rewards)
-
