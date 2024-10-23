@@ -143,6 +143,7 @@ class ImitationLearning:
         # Convert dones to float and then to the same device as other tensors
         dones_float = dones.float().to(z_values.device)
         
+        # TODO: reward should be estimated from the reward network
         target_z_values = rewards + gamma * next_z_values * (1 - dones_float) # no next_z for the last state
         
         loss = torch.mean((z_values - target_z_values.detach())**2)
