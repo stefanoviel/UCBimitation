@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # Define the parameters
-seeds=(3 22 42 64 99 123 456 789 999 1024)  # List of different seeds
-num_of_NNs=(1 2 3 5 10)          # List of different --num-of-NNs values
+# seeds=(3 22 42 64 99 123 456 789 999 1024)  # first run
+seeds=(4 23 43 65 100 124 457 790 1000 1025)  
+num_of_NNs=(1 2 3 5 10)         
 
 # Function to generate and run the command
 run_command() {
