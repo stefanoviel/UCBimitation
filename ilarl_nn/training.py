@@ -68,8 +68,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
                                  use_memory_replay=use_memory_replay, z_std_multiplier=z_std_multiplier, recompute_rewards=recompute_rewards)
 
     all_true_rewards = []
-    
-    expert_states, expert_actions = load_and_preprocess_expert_data(expert_file, device)
+
     
     for k in range(max_iter_num):
         start_time = time.time()
@@ -77,8 +76,8 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
         policy_states, policy_actions, true_policy_rewards = collect_trajectory(env, il_agent, device, max_steps)
 
         iteration_data = {
-            'expert_traj_states': expert_states[-1],
-            'expert_traj_actions': expert_actions[-1],
+            'expert_traj_states': expert_states,
+            'expert_traj_actions': expert_actions,
             'policy_states': policy_states,
             'policy_actions': policy_actions,
             'true_policy_rewards': true_policy_rewards

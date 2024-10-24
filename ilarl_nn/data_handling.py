@@ -15,6 +15,7 @@ def load_and_preprocess_expert_data(expert_file, device):
     expert_states = data['states']
     expert_actions = data['actions']
 
+
     return torch.tensor(np.array(expert_states), device=device), torch.tensor(np.array(expert_actions), device=device)
 
 

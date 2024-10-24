@@ -72,6 +72,7 @@ class ImitationLearning:
         return action
 
     def update_reward(self, expert_states, expert_actions, policy_states, policy_actions, eta):
+
         # Remove the last state and action if they don't match
         if expert_states.shape[0] != expert_actions.shape[0]:
             expert_states = expert_states[:-1]
