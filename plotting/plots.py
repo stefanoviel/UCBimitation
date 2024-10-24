@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-main_folder = 'runs_memory_replay'
+main_folder = 'runs_memory_replay_recompute'
 os.makedirs(f'figs/{main_folder}', exist_ok=True)
 
 # Read the CSV file

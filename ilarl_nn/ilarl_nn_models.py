@@ -62,7 +62,6 @@ class ImitationLearning:
         with torch.no_grad():
             logits = self.policy(state)
 
-            # TODO: why doesn't it work with 1 NN?
             if torch.isnan(logits).any() or torch.isinf(logits).any():
                 print("state", state)
                 print("logits", logits)
