@@ -30,23 +30,32 @@ def train_expert(env_name, total_timesteps, n_envs=4):
 
 def collect_trajectories(model, env_name, num_trajectories):
     env = gym.make(env_name)
-    trajectories = []
+    all_states = []
+    all_actions = []
 
     for _ in range(num_trajectories):
         obs, _ = env.reset()
         done = False
-        trajectory = []
+        trajectory_states = []
+        trajectory_actions = []
 
         while not done:
             action, _ = model.predict(obs, deterministic=True)
             next_obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
-            trajectory.append((obs, action, reward, next_obs, done))
+            
+            trajectory_states.append(obs)
+            trajectory_actions.append(action)
+            
             obs = next_obs
 
-        trajectories.append(trajectory)
+        all_states.extend(trajectory_states)
+        all_actions.extend(trajectory_actions)
 
-    return trajectories
+    return {
+        'states': np.array(all_states),
+        'actions': np.array(all_actions)
+    }
 
 def save_trajectories(trajectories, env_name):
     folder_name = os.path.join("assets", f"trajectories_{env_name}")
@@ -80,15 +89,13 @@ def main():
     # Save the model
     expert_model.save(f"ppo_{args.env}") 
 
-    # Collect trajectories
+    # In the main function, replace the existing collect_trajectories and save_trajectories calls with:
     trajectories = collect_trajectories(expert_model, args.env, args.trajectories)
-
-    # Save trajectories
     save_trajectories(trajectories, args.env)
 
     # Print some statistics
-    print(f"Collected {len(trajectories)} trajectories")
-    print(f"Average trajectory length: {np.mean([len(traj) for traj in trajectories]):.2f}")
+    print(f"Collected {len(trajectories['states'])} state-action pairs")
+    print(f"Average trajectory length: {len(trajectories['states']) / args.trajectories:.2f}")
 
     # Visualize continuously if requested
     if args.visualize:
