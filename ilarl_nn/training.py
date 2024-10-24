@@ -82,8 +82,11 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
             'policy_actions': policy_actions,
             'true_policy_rewards': true_policy_rewards
         }
-
-        all_true_rewards.append(iteration_data['true_policy_rewards'].mean().item())
+        
+        if args.env_name.startswith('Discrete'):
+            all_true_rewards.append(iteration_data['true_policy_rewards'].mean().item())
+        else:
+            all_true_rewards.append(iteration_data['true_policy_rewards'].sum().item())
         log_average_true_reward(writer, all_true_rewards, k)
 
         policy_loss, kl_div = update_policy(il_agent, iteration_data, args)
@@ -96,6 +99,6 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
 
         end_time = time.time()
-        log_iteration_summary(k, iteration_data, policy_loss, reward_loss, q_values, estimated_policy_reward, end_time - start_time)
+        log_iteration_summary(env, k, iteration_data, policy_loss, reward_loss, q_values, estimated_policy_reward, end_time - start_time)
 
     return il_agent, all_true_rewards

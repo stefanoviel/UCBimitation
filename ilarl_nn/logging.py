@@ -20,13 +20,18 @@ def setup_logging(log_dir=None, use_memory_replay=False, seed=None, num_of_NNs=N
     
     return writer
 
-def log_iteration_summary(k, data, policy_loss, reward_loss, q_values, estimated_policy_reward, duration):
+def log_iteration_summary(env, k, data, policy_loss, reward_loss, q_values, estimated_policy_reward, duration):
+    if env.spec.id.startswith('Discrete'):
+        true_mean_episodic_return = data['true_policy_rewards'].mean().item()
+    else:
+        true_mean_episodic_return = data['true_policy_rewards'].sum().item()
+
     print(f"Iteration {k}: "
           f"Reward Loss = {reward_loss:.4f}, "
           f"Policy Loss = {policy_loss:.4f}, "
           f"Avg Q-value = {q_values.mean().item():.4f}, "
           f"Estimated Mean Policy reward = {estimated_policy_reward:.4f}, "
-          f"True Mean Episodic Return = {data['true_policy_rewards'].mean().item():.4f}, "
+          f"True Mean Episodic Return = {true_mean_episodic_return:.4f}, "
           f"Loop Duration = {duration:.4f} seconds")
 
 def log_average_true_reward(writer, true_rewards, iteration):

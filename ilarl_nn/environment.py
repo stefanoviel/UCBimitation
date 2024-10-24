@@ -47,7 +47,7 @@ def collect_trajectory(env, agent, device, max_steps=10000):
         rewards.append(reward)
         
         if done:
-            print("Done")
+            print("number of iterations", iterations)
             break
 
         state_tensor = torch.tensor(next_state, dtype=torch.float32, device=device)
