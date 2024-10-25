@@ -236,4 +236,11 @@ class ImitationLearning:
             avg_z_variance = z_variance_per_sa.mean().item()
         return avg_z_variance
 
+    def get_replay_buffer_size(self):
+        return len(self.policy_replay_buffer)  # Adjust this based on your actual implementation
 
+    def get_policy_replay_buffer_size(self):
+        return len(self.policy_replay_buffer)
+
+    def get_z_replay_buffer_size(self):
+        return len(self.z_replay_buffers[0])

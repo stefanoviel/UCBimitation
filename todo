@@ -1,4 +1,7 @@
-
+find way to diversity the z networks. 
+use fixed target network. 
+how are we handling exploration? 
+which metric could I look at to get a better sense of the performance? 
 
 questions: 
     why in the definition we say that z estimates V(s, a) isn't the value function supposed to be for the states? 

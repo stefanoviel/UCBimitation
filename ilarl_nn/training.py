@@ -98,6 +98,13 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
 
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
 
+        # Log replay buffer sizes
+        if args.use_memory_replay:
+            policy_buffer_size = il_agent.get_policy_replay_buffer_size()
+            z_buffer_size = il_agent.get_z_replay_buffer_size()
+            writer.add_scalar('Buffer/Policy Size', policy_buffer_size, k)
+            writer.add_scalar('Buffer/Z Size', z_buffer_size, k)
+
         end_time = time.time()
         log_iteration_summary(env, k, iteration_data, policy_loss, reward_loss, q_values, estimated_policy_reward, end_time - start_time)
 
