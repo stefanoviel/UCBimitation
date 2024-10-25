@@ -29,6 +29,7 @@ def parse_arguments():
     parser.add_argument('--z-std-multiplier', type=float, default=1.0, metavar='G',
                         help='multiplier for the standard deviation of the z-values')
     parser.add_argument('--recompute_rewards', action='store_true', help='Recompute rewards using the reward network instead of using stored rewards')
+    parser.add_argument('--target_update_freq', type=int, default=100, help='Number of steps between target network updates')
     
     return parser.parse_args()
 

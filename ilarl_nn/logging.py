@@ -67,3 +67,9 @@ def log_rewards_and_q_values(il_agent, data, writer, k, action_dim):
     writer.add_scalar('Metrics/Avg Q-value', q_values.mean().item(), k)
 
     return q_values, estimated_policy_reward
+
+def log_replay_buffer_sizes(writer, il_agent, iteration):
+    policy_buffer_size = il_agent.get_policy_replay_buffer_size()
+    z_buffer_size = il_agent.get_z_replay_buffer_size()
+    writer.add_scalar('Buffer/Policy Size', policy_buffer_size, iteration)
+    writer.add_scalar('Buffer/Z Size', z_buffer_size, iteration)

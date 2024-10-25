@@ -22,7 +22,7 @@ class TwoLayerNet(torch.nn.Module):
 
 class ImitationLearning:
     def __init__(self, state_dim, action_dim, num_of_NNs, buffer_size, batch_size, learning_rate=1e-3, device='cpu', seed=None, 
-                 use_memory_replay=False, z_std_multiplier=1.0, recompute_rewards=False):
+                 use_memory_replay=False, z_std_multiplier=1.0, recompute_rewards=False, target_update_freq=100):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_of_NNs = num_of_NNs
@@ -38,6 +38,11 @@ class ImitationLearning:
         self.policy = TwoLayerNet(state_dim, action_dim).to(device)
         self.reward = TwoLayerNet(state_dim + action_dim, 1).to(device)
         self.z_networks = [TwoLayerNet(state_dim + action_dim, 1).to(device) for _ in range(num_of_NNs)]
+        self.z_target_networks = [TwoLayerNet(state_dim + action_dim, 1).to(device) for _ in range(num_of_NNs)]
+        
+        # Initialize target networks with the same weights as the main networks
+        for z_net, z_target_net in zip(self.z_networks, self.z_target_networks):
+            z_target_net.load_state_dict(z_net.state_dict())
         
         self.policy_optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.reward_optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate)
@@ -51,6 +56,9 @@ class ImitationLearning:
 
         self.fixed_sa_pairs = None
         self.initialize_fixed_sa_pairs(100)  # Initialize 100 fixed state-action pairs
+        
+        self.target_update_freq = target_update_freq
+        self.update_counter = 0
     
     def initialize_fixed_sa_pairs(self, num_pairs):
         states = torch.rand((num_pairs, self.state_dim), device=self.device)
@@ -134,13 +142,14 @@ class ImitationLearning:
         sa = torch.cat((states, actions_one_hot.float()), dim=1)
 
         z_net = self.z_networks[z_index]
+        z_target_net = self.z_target_networks[z_index]
         z_opt = self.z_optimizers[z_index]
         
         z_values = z_net(sa).squeeze()
 
-        # Compute next state-action pairs for z_net
+        # Compute next state-action pairs for z_target_net
         next_sa = torch.cat((next_states, actions_one_hot.float()), dim=1)
-        next_z_values = z_net(next_sa).squeeze()
+        next_z_values = z_target_net(next_sa).squeeze()
         
         # Convert dones to float and then to the same device as other tensors
         dones_float = dones.float().to(z_values.device)
@@ -159,6 +168,10 @@ class ImitationLearning:
         loss.backward()
         z_opt.step()
 
+        self.update_counter += 1
+        if self.update_counter % self.target_update_freq == 0:
+            z_target_net.load_state_dict(z_net.state_dict())
+
         return loss.item()
 
     def compute_q_values(self, states):
@@ -166,7 +179,7 @@ class ImitationLearning:
         actions = torch.eye(self.action_dim, device=self.device).unsqueeze(0).repeat(states.shape[0], 1, 1)
         state_action_pairs = torch.cat([states_expanded, actions], dim=2)
 
-        z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_networks])
+        z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_target_networks])
         z_avg = torch.mean(z_values, dim=0)
         if len(self.z_networks) > 1:
             z_std = torch.std(z_values, dim=0)

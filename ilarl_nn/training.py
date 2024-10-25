@@ -1,4 +1,4 @@
-from ilarl_nn.logging import setup_logging, log_rewards_and_q_values, log_iteration_summary, log_average_true_reward
+from ilarl_nn.logging import setup_logging, log_rewards_and_q_values, log_iteration_summary, log_average_true_reward, log_replay_buffer_sizes
 from ilarl_nn.data_handling import load_and_preprocess_expert_data
 from ilarl_nn.environment import collect_trajectory
 from ilarl_nn.utils import prepare_csv_data, safe_write_csv
@@ -57,6 +57,7 @@ def update_z_networks(il_agent,args,num_of_NNs, action_dim, env, device):
 
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, args, z_std_multiplier, seed=None, max_steps=10000, use_memory_replay=False, buffer_size=None, batch_size=None, log_dir=None, recompute_rewards=False):
+    
     writer = setup_logging(log_dir, use_memory_replay, seed, num_of_NNs)
 
     expert_states, expert_actions = load_and_preprocess_expert_data(expert_file, device)
@@ -65,11 +66,11 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
     action_dim = env.action_space.n
     
     il_agent = ImitationLearning(state_dim, action_dim, num_of_NNs, buffer_size, batch_size, device=device, seed=seed, 
-                                 use_memory_replay=use_memory_replay, z_std_multiplier=z_std_multiplier, recompute_rewards=recompute_rewards)
+                                 use_memory_replay=use_memory_replay, z_std_multiplier=z_std_multiplier, 
+                                 recompute_rewards=recompute_rewards, target_update_freq=args.target_update_freq)
 
     all_true_rewards = []
 
-    
     for k in range(max_iter_num):
         start_time = time.time()
 
@@ -90,20 +91,16 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
         log_average_true_reward(writer, all_true_rewards, k)
 
         policy_loss, kl_div = update_policy(il_agent, iteration_data, args)
-        reward_loss = il_agent.update_reward(iteration_data['expert_traj_states'], iteration_data['expert_traj_actions'], 
-                                             iteration_data['policy_states'], iteration_data['policy_actions'], args.eta)
+        reward_loss = il_agent.update_reward(iteration_data['expert_traj_states'], iteration_data     ['expert_traj_actions'], iteration_data['policy_states'], iteration_data['policy_actions'], args.eta)
+
         z_loss = update_z_networks(il_agent, args, num_of_NNs, action_dim, env, device)
         z_variance = il_agent.compute_z_variance()
         writer.add_scalar('Metrics/Z Variance', z_variance, k)
 
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
 
-        # Log replay buffer sizes
         if args.use_memory_replay:
-            policy_buffer_size = il_agent.get_policy_replay_buffer_size()
-            z_buffer_size = il_agent.get_z_replay_buffer_size()
-            writer.add_scalar('Buffer/Policy Size', policy_buffer_size, k)
-            writer.add_scalar('Buffer/Z Size', z_buffer_size, k)
+            log_replay_buffer_sizes(writer, il_agent, k)
 
         end_time = time.time()
         log_iteration_summary(env, k, iteration_data, policy_loss, reward_loss, q_values, estimated_policy_reward, end_time - start_time)
