@@ -39,6 +39,7 @@ def update_z_networks(il_agent,args,num_of_NNs, action_dim, env, device):
             z_states, z_actions, _ = collect_trajectory(env, il_agent, device)
             estimated_z_rewards = il_agent.reward(torch.cat((z_states, torch.nn.functional.one_hot(z_actions, num_classes=action_dim).float()), dim=1))
             for i in range(len(z_states)):
+  
                 il_agent.add_z_experience(
                     z_states[i],
                     z_actions[i],

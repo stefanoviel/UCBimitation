@@ -36,6 +36,8 @@ class ImitationLearning:
                 torch.cuda.manual_seed(seed)
         
         self.policy = TwoLayerNet(state_dim, action_dim).to(device)
+        self.policy_target = TwoLayerNet(state_dim, action_dim).to(device)
+        self.policy_target.load_state_dict(self.policy.state_dict())
         self.reward = TwoLayerNet(state_dim + action_dim, 1).to(device)
         self.z_networks = [TwoLayerNet(state_dim + action_dim, 1).to(device) for _ in range(num_of_NNs)]
         self.z_target_networks = [TwoLayerNet(state_dim + action_dim, 1).to(device) for _ in range(num_of_NNs)]
@@ -59,6 +61,8 @@ class ImitationLearning:
         
         self.target_update_freq = target_update_freq
         self.update_counter = 0
+        self.policy_target_update_freq = target_update_freq
+        self.policy_update_counter = 0
     
     def initialize_fixed_sa_pairs(self, num_pairs):
         states = torch.rand((num_pairs, self.state_dim), device=self.device)
@@ -213,12 +217,14 @@ class ImitationLearning:
         logits = self.policy(states)
         current_probs = torch.softmax(logits, dim=-1)
         
-        old_probs = current_probs.detach()
+        with torch.no_grad():
+            target_logits = self.policy_target(states)
+            old_probs = torch.softmax(target_logits, dim=-1)
 
         # Policy gradient loss
         pg_loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
 
-        # KL divergence loss to stay close to old policy  [doesn't make a difference if we have the minus here or not]
+        # KL divergence loss to stay close to old policy
         kl_div = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))
 
         # Combined loss
@@ -226,7 +232,12 @@ class ImitationLearning:
 
         self.policy_optimizer.zero_grad()
         loss.backward()
-        self.policy_optimizer.step() # TODO: try to do more steps
+        self.policy_optimizer.step()
+
+        # Update target network
+        self.policy_update_counter += 1
+        if self.policy_update_counter % self.policy_target_update_freq == 0:
+            self.policy_target.load_state_dict(self.policy.state_dict())
 
         return loss.item(), kl_div.item()
 
