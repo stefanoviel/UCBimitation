@@ -16,7 +16,7 @@ def parse_arguments():
     parser.add_argument('--num-of-NNs', type=int, default=5, metavar='N',
                         help='number of neural networks to use')
     parser.add_argument('--seed', type=int, default=1, metavar='N')
-    parser.add_argument('--eta', type=float, default=10, metavar='G')
+    parser.add_argument('--eta', type=float, default=0.1, metavar='G')
     parser.add_argument('--gamma', type=float, default=0.99, metavar='G')
     parser.add_argument('--use-memory-replay', action='store_true',
                         help='use memory replay for policy updates')

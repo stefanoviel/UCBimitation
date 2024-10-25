@@ -3,16 +3,20 @@ import os
 from datetime import datetime
 import torch
 
-def setup_logging(log_dir=None, use_memory_replay=False, seed=None, num_of_NNs=None):
+def setup_logging(args):
     current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
-    memory_replay_str = "with_memory_replay" if use_memory_replay else "without_memory_replay"
-    seed_str = f"seed{seed}" if seed is not None else ""
-    nn_str = f"nn{num_of_NNs}" if num_of_NNs is not None else ""
     
-    if log_dir is None:
-        log_dir = os.path.join("runs", f"imitation_learning_{memory_replay_str}_{seed_str}_{nn_str}_{current_time}")
+    # Create a string of selected arguments
+    selected_args = [
+        'seed', 'num_of_NNs', 'use_memory_replay', 'z_std_multiplier',
+        'recompute_rewards', 'target_update_freq', 'eta', 'buffer_size', 'batch_size'
+    ]
+    args_str = '_'.join([f"{k}={getattr(args, k)}" for k in selected_args if hasattr(args, k)])
+    
+    if args.log_dir is None:
+        log_dir = os.path.join("runs", f"imitation_learning_{args_str}_{current_time}")
     else:
-        log_dir = os.path.join(log_dir, f"{memory_replay_str}_{seed_str}_{nn_str}_{current_time}")
+        log_dir = os.path.join(args.log_dir, f"{args_str}_{current_time}")
     
     os.makedirs(log_dir, exist_ok=True)
     

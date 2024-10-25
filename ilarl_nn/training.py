@@ -58,7 +58,7 @@ def update_z_networks(il_agent,args,num_of_NNs, action_dim, env, device):
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, args, z_std_multiplier, seed=None, max_steps=10000, use_memory_replay=False, buffer_size=None, batch_size=None, log_dir=None, recompute_rewards=False):
     
-    writer = setup_logging(log_dir, use_memory_replay, seed, num_of_NNs)
+    writer = setup_logging(args)
 
     expert_states, expert_actions = load_and_preprocess_expert_data(expert_file, device)
     
