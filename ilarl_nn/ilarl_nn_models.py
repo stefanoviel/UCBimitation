@@ -4,7 +4,6 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
-from ilarl_nn.replay_buffer import ReplayBuffer
 
 
 class TwoLayerNet(torch.nn.Module):
@@ -88,7 +87,7 @@ class ImitationLearning:
         
         return loss.item()
     
-    def update_z_without_replay(self, states, actions, estimated_rewards, gamma, eta, z_index):
+    def update_z_networks(self, states, actions, estimated_rewards, gamma, eta, z_index):
         actions_one_hot = torch.nn.functional.one_hot(actions, num_classes=self.action_dim)
         sa = torch.cat((states, actions_one_hot.float()), dim=1)
 
@@ -144,14 +143,6 @@ class ImitationLearning:
         return loss.item()
 
 
-    def add_z_experience(self, state, action, reward, next_state, done, z_index):
-        if self.use_memory_replay:
-            self.z_replay_buffers[z_index].push(state, action, reward, next_state, done)
-
-    def add_policy_experience(self, state, action, reward, next_state, done):
-        if self.use_memory_replay:
-            self.policy_replay_buffer.push(state, action, reward, next_state, done)
-
     def compute_z_variance(self):
         with torch.no_grad():
             # Stack predictions from all Z networks
@@ -161,12 +152,3 @@ class ImitationLearning:
             # Average variance across all state-action pairs
             avg_z_variance = z_variance_per_sa.mean().item()
         return avg_z_variance
-
-    def get_replay_buffer_size(self):
-        return len(self.policy_replay_buffer)  # Adjust this based on your actual implementation
-
-    def get_policy_replay_buffer_size(self):
-        return len(self.policy_replay_buffer)
-
-    def get_z_replay_buffer_size(self):
-        return len(self.z_replay_buffers[0])

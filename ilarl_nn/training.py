@@ -16,7 +16,7 @@ def update_z_networks(il_agent, args, num_of_NNs, action_dim, env, device):
         # Collect new experiences and update z network directly
         z_states, z_actions, _ = collect_trajectory(env, il_agent, device)
         estimated_z_rewards = il_agent.reward(torch.cat((z_states, torch.nn.functional.one_hot(z_actions, num_classes=action_dim).float()), dim=1))
-        z_loss += il_agent.update_z_without_replay(z_states, z_actions, estimated_z_rewards, args.gamma, args.eta, z_index)
+        z_loss += il_agent.update_z_networks(z_states, z_actions, estimated_z_rewards, args.gamma, args.eta, z_index)
     return z_loss / num_of_NNs
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, args, z_std_multiplier, seed=None, max_steps=10000):
