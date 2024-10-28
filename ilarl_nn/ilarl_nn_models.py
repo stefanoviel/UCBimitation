@@ -21,14 +21,13 @@ class TwoLayerNet(torch.nn.Module):
 
 
 class ImitationLearning:
-    def __init__(self, state_dim, action_dim, num_of_NNs, buffer_size, batch_size, learning_rate=1e-3, device='cpu', seed=None, 
-                 use_memory_replay=False, z_std_multiplier=1.0, recompute_rewards=False, target_update_freq=100):
+    def __init__(self, state_dim, action_dim, num_of_NNs, learning_rate=1e-3, device='cpu', seed=None, 
+                 z_std_multiplier=1.0):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_of_NNs = num_of_NNs
         self.device = device
         self.z_std_multiplier = z_std_multiplier
-        self.recompute_rewards = recompute_rewards
 
         if seed is not None:
             torch.manual_seed(seed)
@@ -36,34 +35,16 @@ class ImitationLearning:
                 torch.cuda.manual_seed(seed)
         
         self.policy = TwoLayerNet(state_dim, action_dim).to(device)
-        self.policy_target = TwoLayerNet(state_dim, action_dim).to(device)
-        self.policy_target.load_state_dict(self.policy.state_dict())
         self.reward = TwoLayerNet(state_dim + action_dim, 1).to(device)
         self.z_networks = [TwoLayerNet(state_dim + action_dim, 1).to(device) for _ in range(num_of_NNs)]
-        self.z_target_networks = [TwoLayerNet(state_dim + action_dim, 1).to(device) for _ in range(num_of_NNs)]
-        
-        # Initialize target networks with the same weights as the main networks
-        for z_net, z_target_net in zip(self.z_networks, self.z_target_networks):
-            z_target_net.load_state_dict(z_net.state_dict())
         
         self.policy_optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.reward_optimizer = optim.Adam(self.reward.parameters(), lr=learning_rate)
         self.z_optimizers = [optim.Adam(net.parameters(), lr=learning_rate) for net in self.z_networks]
         
-        self.use_memory_replay = use_memory_replay
-        if use_memory_replay:
-            self.policy_replay_buffer = ReplayBuffer(buffer_size)
-            self.z_replay_buffers = [ReplayBuffer(buffer_size) for _ in range(num_of_NNs)]
-            self.batch_size = batch_size
-
         self.fixed_sa_pairs = None
-        self.initialize_fixed_sa_pairs(100)  # Initialize 100 fixed state-action pairs
-        
-        self.target_update_freq = target_update_freq
-        self.update_counter = 0
-        self.policy_target_update_freq = target_update_freq
-        self.policy_update_counter = 0
-    
+        self.initialize_fixed_sa_pairs(100)
+
     def initialize_fixed_sa_pairs(self, num_pairs):
         states = torch.rand((num_pairs, self.state_dim), device=self.device)
         actions = torch.randint(0, self.action_dim, (num_pairs,), device=self.device)
@@ -107,13 +88,7 @@ class ImitationLearning:
         
         return loss.item()
     
-    def update_z_at_index(self, states, actions, rewards, gamma, eta, z_index):
-        if self.use_memory_replay:
-            return self.update_z_with_replay(gamma, eta, z_index)
-        else:
-            return self.update_z_without_replay(states, actions, rewards, gamma, eta, z_index)
-
-    def update_z_without_replay(self, states, actions, rewards, gamma, eta, z_index):
+    def update_z_without_replay(self, states, actions, estimated_rewards, gamma, eta, z_index):
         actions_one_hot = torch.nn.functional.one_hot(actions, num_classes=self.action_dim)
         sa = torch.cat((states, actions_one_hot.float()), dim=1)
 
@@ -122,10 +97,10 @@ class ImitationLearning:
         
         z_values = z_net(sa).squeeze()
         
-        discounted_future_rewards = torch.zeros_like(rewards)
+        discounted_future_rewards = torch.zeros_like(estimated_rewards)
         running_sum = 0
-        for t in reversed(range(len(rewards))):
-            running_sum = rewards[t] + gamma * running_sum
+        for t in reversed(range(len(estimated_rewards))):
+            running_sum = estimated_rewards[t] + gamma * running_sum
             discounted_future_rewards[t] = running_sum
         
         loss = torch.mean((z_values - discounted_future_rewards)**2)
@@ -136,54 +111,12 @@ class ImitationLearning:
 
         return loss.item()
 
-    def update_z_with_replay(self, gamma, eta, z_index):
-        if len(self.z_replay_buffers[z_index]) < self.batch_size:
-            return 0  # Not enough samples to update
-
-        states, actions, stored_rewards, next_states, dones = self.z_replay_buffers[z_index].sample(self.batch_size)
-        
-        actions_one_hot = torch.nn.functional.one_hot(actions, num_classes=self.action_dim)
-        sa = torch.cat((states, actions_one_hot.float()), dim=1)
-
-        z_net = self.z_networks[z_index]
-        z_target_net = self.z_target_networks[z_index]
-        z_opt = self.z_optimizers[z_index]
-        
-        z_values = z_net(sa).squeeze()
-
-        # Compute next state-action pairs for z_target_net
-        next_sa = torch.cat((next_states, actions_one_hot.float()), dim=1)
-        next_z_values = z_target_net(next_sa).squeeze()
-        
-        # Convert dones to float and then to the same device as other tensors
-        dones_float = dones.float().to(z_values.device)
-        
-        if self.recompute_rewards:
-            # Recompute rewards using the current reward network
-            rewards = self.reward(sa).squeeze()
-        else:
-            rewards = stored_rewards
-
-        target_z_values = rewards + gamma * next_z_values * (1 - dones_float) # only consider the reward if terminal state
-        
-        loss = torch.mean((z_values - target_z_values.detach())**2)
-        
-        z_opt.zero_grad()
-        loss.backward()
-        z_opt.step()
-
-        self.update_counter += 1
-        if self.update_counter % self.target_update_freq == 0:
-            z_target_net.load_state_dict(z_net.state_dict())
-
-        return loss.item()
-
     def compute_q_values(self, states):
         states_expanded = states.unsqueeze(1).repeat(1, self.action_dim, 1)
         actions = torch.eye(self.action_dim, device=self.device).unsqueeze(0).repeat(states.shape[0], 1, 1)
         state_action_pairs = torch.cat([states_expanded, actions], dim=2)
 
-        z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_target_networks])
+        z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_networks])
         z_avg = torch.mean(z_values, dim=0)
         if len(self.z_networks) > 1:
             z_std = torch.std(z_values, dim=0)
@@ -194,52 +127,21 @@ class ImitationLearning:
         
         return rewards + z_avg + self.z_std_multiplier * z_std
     
-    def update_policy(self, eta):
-        if self.use_memory_replay:
-            return self.update_policy_with_replay(eta)
-        else:
-            raise ValueError("This method should not be called when memory replay is disabled.")
 
-    def update_policy_with_replay(self, eta):
-        if len(self.policy_replay_buffer) < self.batch_size:
-            return 0, 0  # Not enough samples to update
-
-        states, actions, rewards, next_states, _ = self.policy_replay_buffer.sample(self.batch_size)
-        
-        return self._compute_policy_update(states, actions, eta)
-
-    def update_policy_without_replay(self, states, actions, eta):
-        return self._compute_policy_update(states, actions, eta)
-
-    def _compute_policy_update(self, states, actions, eta):
+    def update_policy(self, states, actions, eta):
         Q = self.compute_q_values(states)
 
         logits = self.policy(states)
         current_probs = torch.softmax(logits, dim=-1)
-        
-        with torch.no_grad():
-            target_logits = self.policy_target(states)
-            old_probs = torch.softmax(target_logits, dim=-1)
 
-        # Policy gradient loss
-        pg_loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
-
-        # KL divergence loss to stay close to old policy
-        kl_div = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))
-
-        # Combined loss
-        loss = pg_loss + kl_div
+        # Policy gradient loss (removed KL divergence since we no longer have target network)
+        loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
 
         self.policy_optimizer.zero_grad()
         loss.backward()
         self.policy_optimizer.step()
 
-        # Update target network
-        self.policy_update_counter += 1
-        if self.policy_update_counter % self.policy_target_update_freq == 0:
-            self.policy_target.load_state_dict(self.policy.state_dict())
-
-        return loss.item(), kl_div.item()
+        return loss.item()
 
 
     def add_z_experience(self, state, action, reward, next_state, done, z_index):

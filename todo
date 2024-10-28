@@ -1,5 +1,5 @@
-find way to diversity the z networks. 
-use fixed target network. 
+find way to diversity the z networks. Right now the trajectories are collected using the average z value for each, so the only diversity comes from the initialization. 
+
 how are we handling exploration? 
 which metric could I look at to get a better sense of the performance? 
 
