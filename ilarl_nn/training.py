@@ -73,7 +73,7 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
         )
 
         z_loss = update_z_networks(il_agent, args, num_of_NNs, action_dim, env, device)
-        z_variance = il_agent.compute_z_variance()
+        z_variance = il_agent.compute_z_std()
         writer.add_scalar('Metrics/Z Variance', z_variance, k)
 
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)

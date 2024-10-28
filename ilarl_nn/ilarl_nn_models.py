@@ -44,7 +44,13 @@ class ImitationLearning:
         self.fixed_sa_pairs = None
         self.initialize_fixed_sa_pairs(100)
 
+        # Add these new parameters
+        self.reward_scale = 1.0  # Adjustable reward scaling
+        
     def initialize_fixed_sa_pairs(self, num_pairs):
+        """
+        Initialize a set of fixed state-action pairs for computing the variance of the z-values.
+        """
         states = torch.rand((num_pairs, self.state_dim), device=self.device)
         actions = torch.randint(0, self.action_dim, (num_pairs,), device=self.device)
         actions_one_hot = torch.nn.functional.one_hot(actions, num_classes=self.action_dim)
@@ -102,6 +108,9 @@ class ImitationLearning:
             running_sum = estimated_rewards[t] + gamma * running_sum
             discounted_future_rewards[t] = running_sum
         
+        # Normalize the discounted future rewards
+        discounted_future_rewards = (discounted_future_rewards - discounted_future_rewards.mean()) / (discounted_future_rewards.std() + 1e-8)   
+        
         loss = torch.mean((z_values - discounted_future_rewards)**2)
         
         z_opt.zero_grad()
@@ -124,6 +133,9 @@ class ImitationLearning:
 
         rewards = self.reward(state_action_pairs)
         
+        # Scale rewards and normalize z_std
+        rewards = self.reward_scale * rewards
+        
         return rewards + z_avg + self.z_std_multiplier * z_std
     
 
@@ -143,12 +155,12 @@ class ImitationLearning:
         return loss.item()
 
 
-    def compute_z_variance(self):
+    def compute_z_std(self):
         with torch.no_grad():
             # Stack predictions from all Z networks
             z_values = torch.stack([z_net(self.fixed_sa_pairs) for z_net in self.z_networks])
             # Compute variance across Z networks (dim=0) for each state-action pair
-            z_variance_per_sa = torch.var(z_values, dim=0)
+            z_variance_per_sa = torch.std(z_values, dim=0)
             # Average variance across all state-action pairs
             avg_z_variance = z_variance_per_sa.mean().item()
         return avg_z_variance
