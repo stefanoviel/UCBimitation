@@ -1,3 +1,5 @@
+in the end what we are doing is UCB with the uncertainty estimated with NNs
+
 find way to diversity the z networks. Right now the trajectories are collected using the average z value for each, so the only diversity comes from the initialization. 
 
 how are we handling exploration? 

@@ -9,7 +9,6 @@ import time
 
 
 
-
 def update_z_networks(il_agent, args, num_of_NNs, action_dim, env, device):
     z_loss = 0
     for z_index in range(num_of_NNs):
@@ -29,7 +28,7 @@ def update_z_networks(il_agent, args, num_of_NNs, action_dim, env, device):
         z_loss += il_agent.update_z_networks(z_states, z_actions, estimated_z_rewards, 
                                            args.gamma, args.eta, z_index)
 
-    return z_loss / num_of_NNs
+    return z_loss
 
 def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, args, z_std_multiplier, seed=None, max_steps=10000):
     writer = setup_logging(args)
@@ -85,12 +84,11 @@ def run_imitation_learning(env, expert_file, max_iter_num, num_of_NNs, device, a
         )
 
         z_loss = update_z_networks(il_agent, args, num_of_NNs, action_dim, env, device)
-        z_variance = il_agent.compute_z_std()
-        writer.add_scalar('Metrics/Z Variance', z_variance, k)
+        z_std = il_agent.compute_z_std()
+        writer.add_scalar('Metrics/Z Std', z_std, k)
 
+        # logging
         q_values, estimated_policy_reward = log_rewards_and_q_values(il_agent, iteration_data, writer, k, action_dim)
-
-        # Add new logging calls
         log_policy_metrics(writer, il_agent, policy_states, k)
         log_z_networks_metrics(writer, il_agent, policy_states, 
                              torch.nn.functional.one_hot(policy_actions, num_classes=action_dim).float(), k)
