@@ -133,6 +133,7 @@ class ImitationLearning:
         state_action_pairs = torch.cat([states_expanded, actions], dim=2)
 
         z_values = torch.stack([z_net(state_action_pairs) for z_net in self.z_networks])
+
         z_avg = torch.mean(z_values, dim=0)
         if len(self.z_networks) > 1:
             z_std = torch.std(z_values, dim=0)
