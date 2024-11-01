@@ -69,6 +69,14 @@ class ImitationLearning:
             action = torch.multinomial(action_probs, 1)
         return action
 
+
+    def get_action_probs(self, state):
+        with torch.no_grad():
+            logits = self.policy(state)
+            action_probs = torch.softmax(logits, dim=-1)
+        return action_probs
+
+
     def update_reward(self, expert_states, expert_actions, policy_states, policy_actions, eta):
 
         # Remove the last state and action if they don't match
@@ -128,13 +136,10 @@ class ImitationLearning:
         z_avg = torch.mean(z_values, dim=0)
         if len(self.z_networks) > 1:
             z_std = torch.std(z_values, dim=0)
-        else:
+        else:   
             z_std = torch.zeros_like(z_avg)
 
         rewards = self.reward(state_action_pairs)
-        
-        # Scale rewards and normalize z_std
-        rewards = self.reward_scale * rewards
         
         return rewards + z_avg + self.z_std_multiplier * z_std
     
@@ -164,3 +169,5 @@ class ImitationLearning:
             # Average variance across all state-action pairs
             avg_z_variance = z_variance_per_sa.mean().item()
         return avg_z_variance
+
+
