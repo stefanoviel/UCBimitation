@@ -17,9 +17,11 @@ fsspec==2024.9.0
 grpcio==1.66.2
 gym==0.25.2
 gym-notices==0.0.8
-gymnasium==0.29.1
+gymnasium==0.28.1
+gymnasium-notices==0.0.1
 ipykernel==6.29.5
 ipython==8.27.0
+jax-jumpy==1.0.0
 jedi==0.19.1
 Jinja2==3.1.4
 jsonschema==4.23.0
@@ -36,6 +38,7 @@ nbformat==5.10.4
 nest-asyncio==1.6.0
 networkx==3.3
 numpy==2.1.1
+opencv-python==4.10.0.84
 packaging==24.1
 pandas==2.2.3
 parso==0.8.4
@@ -48,6 +51,7 @@ protobuf==5.28.2
 psutil==6.0.0
 ptyprocess==0.7.0
 pure_eval==0.2.3
+pygame==2.6.1
 Pygments==2.18.0
 pyparsing==3.1.4
 python-dateutil==2.9.0.post0
@@ -57,6 +61,7 @@ referencing==0.35.1
 rpds-py==0.20.0
 scipy==1.14.1
 seaborn==0.13.2
+Shimmy==2.0.0
 six==1.16.0
 stable_baselines3==2.3.2
 stack-data==0.6.3
