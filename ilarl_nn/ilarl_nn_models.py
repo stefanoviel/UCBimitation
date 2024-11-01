@@ -149,13 +149,21 @@ class ImitationLearning:
 
         logits = self.policy(states)
         current_probs = torch.softmax(logits, dim=-1)
+        
+        old_probs = current_probs.detach()
 
-        # Policy gradient loss (removed KL divergence since we no longer have target network)
-        loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
+        # Policy gradient loss
+        pg_loss = -torch.mean(torch.sum(current_probs * (eta * Q.squeeze(-1)), dim=1))
+
+        # KL divergence loss to stay close to old policy  [doesn't make a difference if we have the minus here or not]
+        kl_div = torch.mean(torch.sum(current_probs * (torch.log(current_probs) - torch.log(old_probs)), dim=1))
+
+        # Combined loss
+        loss = pg_loss + kl_div
 
         self.policy_optimizer.zero_grad()
         loss.backward()
-        self.policy_optimizer.step()
+        self.policy_optimizer.step() # TODO: try to do more steps
 
         return loss.item()
 
