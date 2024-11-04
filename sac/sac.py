@@ -5,6 +5,7 @@ import torch
 from torch.optim import Adam
 import gym
 import time
+from torch.utils.tensorboard import SummaryWriter
 # import core from sac
 from sac import core
 
@@ -44,7 +45,7 @@ class ReplayBuffer:
 
 
 def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0, 
-        steps_per_epoch=100, epochs=100, replay_size=int(1e6), gamma=0.99, 
+        steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, 
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
         update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, 
         save_freq=1):
@@ -230,6 +231,8 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
     # Set up model saving
     # logger.setup_pytorch_saver(ac)
 
+    writer = SummaryWriter(f'runs/sac/{seed}_{time.strftime("%Y%m%d-%H%M%S")}')
+
     def update(data):
         # First run one gradient descent step for Q1 and Q2
         q_optimizer.zero_grad()
@@ -269,6 +272,13 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
                 p_targ.data.mul_(polyak)
                 p_targ.data.add_((1 - polyak) * p.data)
 
+        # Add tensorboard logging for training metrics
+        writer.add_scalar('Loss/Q', loss_q_val, t)
+        writer.add_scalar('Loss/Policy', loss_pi_val, t)
+        writer.add_scalar('Values/Q1', q1_vals.mean(), t)
+        writer.add_scalar('Values/Q2', q2_vals.mean(), t)
+        writer.add_scalar('Values/LogPi', log_pi_val.mean(), t)
+
     def get_action(o, deterministic=False):
         return ac.act(torch.as_tensor(o, dtype=torch.float32), 
                       deterministic)
@@ -298,7 +308,6 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
-        print(f"Step {t}")
         
         # Until start_steps have elapsed, randomly sample actions
         # from a uniform distribution for better exploration. Afterwards, 
@@ -309,8 +318,6 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             a = env.action_space.sample()
 
         # Step the env
-        print("action", a)
-        print("step", env.step(a))
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
@@ -332,6 +339,10 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             ep_ret_list.append(ep_ret)
             ep_len_list.append(ep_len)
             o, ep_ret, ep_len = env.reset(), 0, 0
+
+            # Add episode metrics logging
+            writer.add_scalar('Episode/Return', ep_ret, t)
+            writer.add_scalar('Episode/Length', ep_len, t)
 
         # Update handling
         if t >= update_after and t % update_every == 0:
@@ -363,6 +374,18 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             # Reset lists for next epoch
             ep_ret_list = []
             ep_len_list = []
+
+            # Add epoch metrics logging
+            writer.add_scalar('Epoch/AverageEpisodeReturn', np.mean(ep_ret_list), epoch)
+            writer.add_scalar('Epoch/AverageTestReturn', np.mean(test_returns), epoch)
+            writer.add_scalar('Epoch/AverageEpisodeLength', np.mean(ep_len_list), epoch)
+            writer.add_scalar('Epoch/AverageTestLength', np.mean(test_lengths), epoch)
+
+            # Add histograms for network parameters
+            for name, param in ac.named_parameters():
+                writer.add_histogram(f'Parameters/{name}', param.data, epoch)
+
+    writer.close()
 
 if __name__ == '__main__':
     import argparse
