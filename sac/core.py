@@ -2,6 +2,7 @@ import numpy as np
 import scipy.signal
 
 import torch
+import gym
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
@@ -84,15 +85,26 @@ class MLPActorCritic(nn.Module):
         super().__init__()
 
         obs_dim = observation_space.shape[0]
-        act_dim = action_space.shape[0]
-        act_limit = action_space.high[0]
+        # Handle both discrete and continuous action spaces
+        if isinstance(action_space, gym.spaces.Discrete):
+            act_dim = 1  # For discrete action spaces
+        else:
+            act_dim = action_space.shape[0]  # For continuous action spaces
+
+        # Action limit for clamping: critically, assumes all dimensions share the same bound!
+        act_limit = action_space.high[0] if hasattr(action_space, 'high') else 1.0
 
         # build policy and value functions
         self.pi = SquashedGaussianMLPActor(obs_dim, act_dim, hidden_sizes, activation, act_limit)
         self.q1 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
         self.q2 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
 
+        self.action_space = action_space
+
     def act(self, obs, deterministic=False):
         with torch.no_grad():
             a, _ = self.pi(obs, deterministic, False)
+            if isinstance(self.action_space, gym.spaces.Discrete):
+                # Convert continuous action to discrete by taking the argmax
+                return a.argmax().item()
             return a.numpy()

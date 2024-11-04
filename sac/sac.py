@@ -7,7 +7,6 @@ import gym
 import time
 # import core from sac
 from sac import core
-from utils.logx import EpochLogger
 
 
 class ReplayBuffer:
@@ -16,6 +15,7 @@ class ReplayBuffer:
     """
 
     def __init__(self, obs_dim, act_dim, size):
+        # Handle both scalar and array observation spaces
         self.obs_buf = np.zeros(core.combined_shape(size, obs_dim), dtype=np.float32)
         self.obs2_buf = np.zeros(core.combined_shape(size, obs_dim), dtype=np.float32)
         self.act_buf = np.zeros(core.combined_shape(size, act_dim), dtype=np.float32)
@@ -44,10 +44,10 @@ class ReplayBuffer:
 
 
 def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0, 
-        steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, 
+        steps_per_epoch=100, epochs=100, replay_size=int(1e6), gamma=0.99, 
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
         update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, 
-        logger_kwargs=dict(), save_freq=1):
+        save_freq=1):
     """
     Soft Actor-Critic (SAC)
 
@@ -145,18 +145,20 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     """
 
-    logger = EpochLogger(**logger_kwargs)
-    logger.save_config(locals())
-
     torch.manual_seed(seed)
     np.random.seed(seed)
 
     env, test_env = env_fn(), env_fn()
     obs_dim = env.observation_space.shape
-    act_dim = env.action_space.shape[0]
+
+    # Handle both discrete and continuous action spaces
+    if isinstance(env.action_space, gym.spaces.discrete.Discrete):
+        act_dim = 1  # For discrete action spaces
+    else:
+        act_dim = env.action_space.shape[0]  # For continuous action spaces
 
     # Action limit for clamping: critically, assumes all dimensions share the same bound!
-    act_limit = env.action_space.high[0]
+    act_limit = env.action_space.high[0] if hasattr(env.action_space, 'high') else 1.0
 
     # Create actor-critic module and target networks
     ac = actor_critic(env.observation_space, env.action_space, **ac_kwargs)
@@ -174,7 +176,7 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     # Count variables (protip: try to get a feel for how different size networks behave!)
     var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.q1, ac.q2])
-    logger.log('\nNumber of parameters: \t pi: %d, \t q1: %d, \t q2: %d\n'%var_counts)
+    print('\nNumber of parameters: \t pi: %d, \t q1: %d, \t q2: %d\n'%var_counts)
 
     # Set up function for computing SAC Q-losses
     def compute_loss_q(data):
@@ -226,7 +228,7 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
     q_optimizer = Adam(q_params, lr=lr)
 
     # Set up model saving
-    logger.setup_pytorch_saver(ac)
+    # logger.setup_pytorch_saver(ac)
 
     def update(data):
         # First run one gradient descent step for Q1 and Q2
@@ -236,7 +238,9 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
         q_optimizer.step()
 
         # Record things
-        logger.store(LossQ=loss_q.item(), **q_info)
+        q1_vals = q_info['Q1Vals']
+        q2_vals = q_info['Q2Vals']
+        loss_q_val = loss_q.item()
 
         # Freeze Q-networks so you don't waste computational effort 
         # computing gradients for them during the policy learning step.
@@ -254,7 +258,8 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             p.requires_grad = True
 
         # Record things
-        logger.store(LossPi=loss_pi.item(), **pi_info)
+        loss_pi_val = loss_pi.item()
+        log_pi_val = pi_info['LogPi']
 
         # Finally, update target networks by polyak averaging.
         with torch.no_grad():
@@ -269,22 +274,31 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
                       deterministic)
 
     def test_agent():
+        test_ep_ret_list = []
+        test_ep_len_list = []
         for j in range(num_test_episodes):
             o, d, ep_ret, ep_len = test_env.reset(), False, 0, 0
             while not(d or (ep_len == max_ep_len)):
-                # Take deterministic actions at test time 
-                o, r, d, _ = test_env.step(get_action(o, True))
+                a = get_action(o, True)
+                o, r, d, _ = test_env.step(a)
                 ep_ret += r
                 ep_len += 1
-            logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
+            test_ep_ret_list.append(ep_ret)
+            test_ep_len_list.append(ep_len)
+        return test_ep_ret_list, test_ep_len_list
 
     # Prepare for interaction with environment
     total_steps = steps_per_epoch * epochs
     start_time = time.time()
     o, ep_ret, ep_len = env.reset(), 0, 0
+    
+    # Initialize lists to store episode returns and lengths
+    ep_ret_list = []
+    ep_len_list = []
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
+        print(f"Step {t}")
         
         # Until start_steps have elapsed, randomly sample actions
         # from a uniform distribution for better exploration. Afterwards, 
@@ -295,6 +309,8 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             a = env.action_space.sample()
 
         # Step the env
+        print("action", a)
+        print("step", env.step(a))
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
@@ -313,7 +329,8 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
         # End of trajectory handling
         if d or (ep_len == max_ep_len):
-            logger.store(EpRet=ep_ret, EpLen=ep_len)
+            ep_ret_list.append(ep_ret)
+            ep_len_list.append(ep_len)
             o, ep_ret, ep_len = env.reset(), 0, 0
 
         # Update handling
@@ -328,44 +345,40 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
             # Save model
             if (epoch % save_freq == 0) or (epoch == epochs):
-                logger.save_state({'env': env}, None)
+                # logger.save_state({'env': env}, None)
+                pass
 
             # Test the performance of the deterministic version of the agent.
-            test_agent()
+            test_returns, test_lengths = test_agent()
 
-            # Log info about epoch
-            logger.log_tabular('Epoch', epoch)
-            logger.log_tabular('EpRet', with_min_and_max=True)
-            logger.log_tabular('TestEpRet', with_min_and_max=True)
-            logger.log_tabular('EpLen', average_only=True)
-            logger.log_tabular('TestEpLen', average_only=True)
-            logger.log_tabular('TotalEnvInteracts', t)
-            logger.log_tabular('Q1Vals', with_min_and_max=True)
-            logger.log_tabular('Q2Vals', with_min_and_max=True)
-            logger.log_tabular('LogPi', with_min_and_max=True)
-            logger.log_tabular('LossPi', average_only=True)
-            logger.log_tabular('LossQ', average_only=True)
-            logger.log_tabular('Time', time.time()-start_time)
-            logger.dump_tabular()
+            # Print epoch information
+            print(f"\n-------- Epoch {epoch} --------")
+            print(f"EpRet: {np.mean(ep_ret_list):.3f} (min: {np.min(ep_ret_list):.3f}, max: {np.max(ep_ret_list):.3f})")
+            print(f"TestEpRet: {np.mean(test_returns):.3f} (min: {np.min(test_returns):.3f}, max: {np.max(test_returns):.3f})")
+            print(f"EpLen: {np.mean(ep_len_list):.3f}")
+            print(f"TestEpLen: {np.mean(test_lengths):.3f}")
+            print(f"TotalEnvInteracts: {t}")
+            print(f"Time: {time.time()-start_time:.3f}")
+            
+            # Reset lists for next epoch
+            ep_ret_list = []
+            ep_len_list = []
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='HalfCheetah-v2')
-    parser.add_argument('--hid', type=int, default=256)
+    parser.add_argument('--env', type=str, default='CartPole-v1')
+    parser.add_argument('--hid', type=int, default=64)
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=50)
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--exp_name', type=str, default='sac')
     args = parser.parse_args()
 
-    from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
 
     torch.set_num_threads(torch.get_num_threads())
 
     sac(lambda : gym.make(args.env), actor_critic=core.MLPActorCritic,
         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), 
-        gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-        logger_kwargs=logger_kwargs)
+        gamma=args.gamma, seed=args.seed, epochs=args.epochs)
