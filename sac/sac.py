@@ -12,6 +12,8 @@ import gym
 import time
 import sys
 from sac import core
+from torch.utils.tensorboard import SummaryWriter
+import datetime
 
 def combined_shape(length, shape=None):
     if shape is None:
@@ -486,6 +488,10 @@ class SAC:
     # Learns from single trajectories rather than batch
 
     def learn_mujoco(self, print_out=False, save_path=None):
+        # Setup tensorboard writer 
+        current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        writer = SummaryWriter(log_dir=f'runs/sac/{current_time}')
+        
         # only called by SMM-IRL
         # Prepare for interaction with environment
         total_steps = self.steps_per_epoch * self.epochs
@@ -544,25 +550,43 @@ class SAC:
 
             # Update handling
             log_pi = 0
-            if self.reinitialize: # default True
-                # NOTE: assert training expert policy
+            losses = None
+            if self.reinitialize:
                 if t >= self.update_after and t % self.update_every == 0:
                     for j in range(self.update_every):
                         batch = self.replay_buffer.sample_batch(self.batch_size)
-                        _, _, log_pi = self.update(data=batch)
+                        losses = self.update(data=batch)  # [loss_q, loss_pi, log_pi]
+                        
+                        # Log training metrics
+                        if losses is not None:
+                            writer.add_scalar('Loss/Q_Value', losses[0], t)
+                            writer.add_scalar('Loss/Policy', losses[1], t)
+                            writer.add_scalar('Policy/Log_Prob', losses[2], t)
+                            writer.add_scalar('Policy/Alpha', self.alpha.item() if self.automatic_alpha_tuning else self.alpha, t)
             else:
-                # NOTE: assert training agent policy
                 if self.replay_buffer.size>=self.update_after and t % self.update_every == 0:
                     for j in range(self.update_every):
                         batch = self.replay_buffer.sample_batch(self.batch_size)
                         obs = batch['obs'][:, self.reward_state_indices]
                         batch['rew'] = torch.FloatTensor(self.reward_function(obs)).to(self.device)
-                        _, _, log_pi = self.update(data=batch)         
+                        losses = self.update(data=batch)
+
+                        # Log training metrics
+                        if losses is not None:
+                            writer.add_scalar('Loss/Q_Value', losses[0], t)
+                            writer.add_scalar('Loss/Policy', losses[1], t)
+                            writer.add_scalar('Policy/Log_Prob', losses[2], t)
+                            writer.add_scalar('Policy/Alpha', self.alpha.item() if self.automatic_alpha_tuning else self.alpha, t)
 
             # End of epoch handling
             if t % self.log_step_interval == 0:
                 # Test the performance of the deterministic version of the agent.
                 test_epret = self.test_fn()
+                
+                # Log evaluation metrics
+                writer.add_scalar('Eval/Episode_Return', test_epret, t)
+                writer.add_scalar('Eval/Best_Return', best_eval, t)
+                
                 if print_out:
                     print(f"SAC Training | Evaluation: {test_epret:.3f} Timestep: {t+1:d} Elapsed {time.time() - local_time:.0f}s")
                 if save_path is not None:
@@ -575,6 +599,7 @@ class SAC:
                 test_time_steps.append(t+1)
                 local_time = time.time()
 
+        writer.close()
         print(f"SAC Training End: time {time.time() - start_time:.0f}s")
         return [test_rets, alphas, log_pis, test_time_steps]
 

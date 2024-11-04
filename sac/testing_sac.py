@@ -1,8 +1,9 @@
 import gym
 import numpy as np
 import torch
-from sac.new_sac import SAC, ReplayBuffer
+from sac.sac import SAC, ReplayBuffer
 from sac import core
+import time
 
 # Set random seeds for reproducibility
 torch.manual_seed(0)
@@ -51,6 +52,45 @@ sac.test_fn = sac.test_agent_ori_env
 # Train the agent
 results = sac.learn_mujoco(print_out=True)
 
-# Test the trained agent
+# Test and visualize the trained agent
+def visualize_agent(agent, env, num_episodes=5, delay=0.02):
+    """
+    Visualize the trained agent's performance.
+    
+    Args:
+        agent: SAC agent
+        env: Gym environment
+        num_episodes: Number of episodes to run
+        delay: Time delay between frames (in seconds)
+    """
+    for episode in range(num_episodes):
+        obs = env.reset()
+        done = False
+        episode_reward = 0
+        steps = 0
+        
+        print(f"\nStarting episode {episode + 1}")
+        
+        while not done:
+            env.render()
+            time.sleep(delay)  # Add delay to make visualization viewable
+            
+            # Get action from agent
+            action = agent.get_action(obs, deterministic=True)
+            
+            # Take step in environment
+            obs, reward, done, _ = env.step(action)
+            episode_reward += reward
+            steps += 1
+        
+        print(f"Episode {episode + 1} finished after {steps} steps with reward {episode_reward:.2f}")
+    
+    env.close()
+
+# Test the trained agent with visualization
+print("\nStarting visualization of trained agent...")
+visualize_agent(sac, env)
+
+# Print final performance metrics
 test_returns = sac.test_agent_ori_env(deterministic=True)
-print(f"Average test return: {test_returns:.2f}")
+print(f"\nFinal average test return over {sac.num_test_episodes} episodes: {test_returns:.2f}")
