@@ -1,4 +1,4 @@
-from ilarl_nn.logging import setup_logging, log_rewards_and_q_values, log_iteration_summary, log_average_true_reward, log_replay_buffer_sizes, log_policy_metrics, log_z_networks_metrics, log_network_gradients, log_expert_policy_comparison
+from ilarl_nn.my_logging import setup_logging, log_rewards_and_q_values, log_iteration_summary, log_average_true_reward, log_replay_buffer_sizes, log_policy_metrics, log_z_networks_metrics, log_network_gradients, log_expert_policy_comparison
 from ilarl_nn.data_handling import load_and_preprocess_expert_data
 from ilarl_nn.environment import collect_trajectory
 from ilarl_nn.utils import prepare_csv_data, safe_write_csv

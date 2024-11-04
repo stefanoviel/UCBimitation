@@ -1,8 +1,9 @@
-in the end what we are doing is UCB with the uncertainty estimated with NNs
+look at state visitation, value function
+standardize observation, moving estimate
+don't shift the reward, only rescale it, otherwise you loose meaning
 
 find way to diversity the z networks. Right now the trajectories are collected using the average z value for each, so the only diversity comes from the initialization. 
 
 how are we handling exploration? 
 
-questions: 
-    why in the definition we say that z estimates V(s, a) isn't the value function supposed to be for the states? 
+
